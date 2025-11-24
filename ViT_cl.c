@@ -5,31 +5,37 @@
 /*
 [잡생각]
 커널 이름 컨벤션 정해두면 좋을듯 => 일단 지금은 '__'로 시작하는 걸로 통일
+cl 메모리 객체 관련해서도 
+
 커널 배열을 만들고 인덱스만 enum으로 지정?
+커널 관련 필요한 정보 -> 파일 경로, 함수 이름, 소스 길이, 소스 문자열
 상수인 것 -> 커널 파일 경로, 커널 함수 이름
+
+그 뭐냐 부분 실행시간 로깅하는 것도 만들면 좋을듯?
+
+커널 setArg하는 부분에 kenrl 정의부만 복붙?
+
+cl_mem들은 stack식으로 push & pop?
+-> 바로바로 release하는게 좋나? 성능상은?
+
+커널을 쓰는 함수에 대해서도 네이밍 컨벤션?
+
+커널 인자 세팅도 함수로 뺄 수 있나?
+
+work_group_size 최대 크기 가져오기?
 */
 
 
 
-typedef struct CL_container{
-    // default data
-    cl_platform_id platform;
-    cl_device_id device;
-    cl_context context;
-    cl_command_queue queue;
-    cl_program program;
+static CL_container container;
+static cl_int err;
 
-    // kernels
-    cl_kernel __normalize;
-} CL_container;
+#define CHECK_CL_ERROR(err) \
+    if (err != CL_SUCCESS) {    \
+        printf("[%s:%d] OpenCL error %d\n", __FILE__, __LINE__, err);   \
+        exit(EXIT_FAILURE); \
+    }   \
 
-
-static inline void check_cl_error(cl_int err) {
-    if (err != CL_SUCCESS) {
-        printf("[%s:%d] OpenCL error %d\n", __FILE__, __LINE__, err);
-        exit(EXIT_FAILURE);
-    }
-}
 
 static char* get_source_code(const char* file_name, size_t* len) {
     int unused_ret;
@@ -61,11 +67,11 @@ static void build_error(cl_program program, cl_device_id device, cl_int err) {
         char* log;
 
         err = clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, NULL, &log_size);
-        check_cl_error(err);
+        CHECK_CL_ERROR(err);
 
         log = (char*)malloc(log_size + 1);
         err = clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, log_size, log, NULL);
-        check_cl_error(err);
+        CHECK_CL_ERROR(err);
 
         log[log_size] = '\0';
         printf("Compiler error:\n%s\n", log);
@@ -74,50 +80,71 @@ static void build_error(cl_program program, cl_device_id device, cl_int err) {
     };
 }
 
-       
-static void init(CL_container* p_container) {
+void init() {
     printf(">> [init] : start\n");
 
     // get platform
-    cl_int err;
-    err = clGetPlatformIDs(1, &p_container->platform, NULL);
-    check_cl_error(err);
+    err = clGetPlatformIDs(1, &container.platform, NULL);
+    CHECK_CL_ERROR(err);
 
     // get device id
-    err = clGetDeviceIDs(p_container->platform, CL_DEVICE_TYPE_GPU, 1, &p_container->device, NULL);
-    check_cl_error(err);
+    err = clGetDeviceIDs(container.platform, CL_DEVICE_TYPE_GPU, 1, &container.device, NULL);
+    CHECK_CL_ERROR(err);
 
     // create context
-    p_container->context = clCreateContext(NULL, 1, &p_container->device, NULL, NULL, &err);
-    check_cl_error(err);
+    container.context = clCreateContext(NULL, 1, &container.device, NULL, NULL, &err);
+    CHECK_CL_ERROR(err);
 
     // create command queue
-    // TODO: set queue as out-of-ordef later
-    p_container->queue = clCreateCommandQueueWithProperties(p_container->context, p_container->device, NULL, &err);
-    check_cl_error(err);
+    // MEMO: set queue as out-of-ordef later
+    container.queue = clCreateCommandQueueWithProperties(container.context, container.device, NULL, &err);
+    CHECK_CL_ERROR(err);
+
 
     // get sources
-    // TODO: add souces here
+    // MEMO: add souces here
     size_t __normalize_len;
-    const char* const __normalize_filepath = "./kernel/normalize.cl";
+    const char* const __normalize_filepath = "./kernels/normalize.cl";
     char* __normalize_src = get_source_code(__normalize_filepath, &__normalize_len);
 
-    // TODO: don't forget to append here
-    char* src_arr[] = { __normalize_src };
-    size_t len_arr[] = { __normalize_len };
+    size_t __reduce_sum_len;
+    const char* const __reduce_sum_filepath = "./kernels/reduce_sum.cl";
+    char* __reduce_sum_src = get_source_code(__reduce_sum_filepath, &__reduce_sum_len);
 
+    size_t __load_square_len;
+    const char* const __load_square_filepath = "./kernels/load_square.cl";
+    char* __load_square_src = get_source_code(__load_square_filepath, &__load_square_len);
+
+    // MEMO: don't forget to append here
+    char* src_arr[] = { __normalize_src, __reduce_sum_src, __load_square_src };
+    size_t len_arr[] = { __normalize_len, __reduce_sum_len, __load_square_len };
+
+
+    
     // create program
-    p_container->program = clCreateProgramWithSource(p_container->context, 1, src_arr, len_arr, &err);
-    check_cl_error(err);
+    cl_uint n_kernels = 3;
+    container.program = clCreateProgramWithSource(container.context, n_kernels, (const char**)src_arr, len_arr, &err);
+    CHECK_CL_ERROR(err);
     
     // build program
-    err = clBuildProgram(p_container->program, 1, &p_container->device, NULL, NULL, NULL);
-    build_error(p_container->program, p_container->device, err);
+    err = clBuildProgram(container.program, 1, &container.device, NULL, NULL, NULL);
+    build_error(container.program, container.device, err);
 
     // create kernels
+    // MEMO: don't forget to append here
     const char* const __normalize_name = "normalize";
-    p_container->__normalize = clCreateKernel(p_container->program, __normalize_name, &err);
-    check_cl_error(err);
+    container.__normalize = clCreateKernel(container.program, __normalize_name, &err);
+    CHECK_CL_ERROR(err);
+
+    const char* const __reduce_sum_name = "reduce_sum";
+    container.__reduce_sum = clCreateKernel(container.program, __reduce_sum_name, &err);
+    CHECK_CL_ERROR(err);
+
+    const char* const __load_square_name = "load_square";
+    container.__load_square = clCreateKernel(container.program, __load_square_name, &err);
+    CHECK_CL_ERROR(err);
+
+
 
     // free sources
     for (int i=0; i<1; ++i) {
@@ -127,16 +154,21 @@ static void init(CL_container* p_container) {
     printf(">> [init] : ended\n");
 }
 
-static void cleanup(CL_container* p_container) {
+void cleanup() {
     printf(">> [cleanup] : start\n");
 
     // release kernels
-    clReleaseKernel(p_container->__normalize);
+    err = clReleaseKernel(container.__normalize);
+    CHECK_CL_ERROR(err);
     
-    clReleaseProgram(p_container->program);
-    clReleaseCommandQueue(p_container->queue);
-    clReleaseContext(p_container->context);
-    clReleaseDevice(p_container->device);
+    err = clReleaseProgram(container.program);
+    CHECK_CL_ERROR(err);
+    err = clReleaseCommandQueue(container.queue);
+    CHECK_CL_ERROR(err);
+    err = clReleaseContext(container.context);
+    CHECK_CL_ERROR(err);
+    err = clReleaseDevice(container.device);
+    CHECK_CL_ERROR(err);
 
     printf(">> [cleanup] : ended\n");
 }
@@ -187,133 +219,134 @@ void ViT_cl (
     Network* networks, 
     float** probabilities
 ) {
-    printf(">> ViT_cl\n");
+    printf(">> [ViT_cl] : start\n");
 
-    CL_container container;
     init(&container);
 
     
 
-    // const int token_size = ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE) + 1);
+    const int token_size = ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE) + 1);
     
-    // float* layer[4];
-    // for (int i = 0; i < 4; i++) {
-    //     layer[i] = (float*)malloc(sizeof(float) * size[i]);
-    // }
+    float* layer[4];
+    for (int i = 0; i < 4; i++) {
+        layer[i] = (float*)malloc(sizeof(float) * size[i]);
+    }
     
-    // // encoding layer
-    // float* enc_layer[12];
-    // for (int i = 0; i < 12; i++) {
-    //     enc_layer[i] = (float*)malloc(sizeof(float) * enc_size);
-    // }
+    // encoding layer
+    float* enc_layer[12];
+    for (int i = 0; i < 12; i++) {
+        enc_layer[i] = (float*)malloc(sizeof(float) * enc_size);
+    }
     
-    // // encoding output
-    // float* enc_output;
-    // enc_output = (float*)malloc(sizeof(float) * enc_size);
+    // encoding output
+    float* enc_output;
+    enc_output = (float*)malloc(sizeof(float) * enc_size);
 
 
 
 
-    // for (int i = 0; i < image->n; i++) {
-    //     /*patch embedding*/
-    //     float* patch_embedded = layer[0];
-    //     Conv2d(image[i].data, patch_embedded, networks[1], networks[2]);
+    for (int i = 0; i < image->n; i++) {
+        /*patch embedding*/
+        float* patch_embedded = layer[0];
+        Conv2d(image[i].data, patch_embedded, networks[1], networks[2]);
 
-    //     /*flatten and transpose*/
-    //     float* flatten_transposed = layer[1];
-    //     flatten_transpose(patch_embedded, flatten_transposed);
+        /*flatten and transpose*/
+        float* flatten_transposed = layer[1];
+        flatten_transpose(patch_embedded, flatten_transposed);
 
-    //     /*prepend class token*/
-    //     float* clas_token_prepended = layer[2];
-    //     class_token(flatten_transposed, clas_token_prepended, networks[0]);
+        /*prepend class token*/
+        float* clas_token_prepended = layer[2];
+        class_token(flatten_transposed, clas_token_prepended, networks[0]);
 
-    //     /*position embedding*/
-    //     float* position_embeded = layer[3];
-    //     pos_emb(clas_token_prepended, position_embeded, networks[3]);
+        /*position embedding*/
+        float* position_embeded = layer[3];
+        pos_emb(clas_token_prepended, position_embeded, networks[3]);
 
-    //     /*Encoder - 12 Layers*/
-    //     {
-    //         Encoder(position_embeded, enc_layer[0],
-    //             networks[4], networks[5], networks[6], networks[7],
-    //             networks[8], networks[9], networks[10], networks[11],
-    //             networks[12], networks[13], networks[14], networks[15]);
+        /*Encoder - 12 Layers*/
+        {
+            Encoder(position_embeded, enc_layer[0],
+                networks[4], networks[5], networks[6], networks[7],
+                networks[8], networks[9], networks[10], networks[11],
+                networks[12], networks[13], networks[14], networks[15]);
 
-    //         Encoder(enc_layer[0], enc_layer[1],
-    //             networks[16], networks[17], networks[18], networks[19],
-    //             networks[20], networks[21], networks[22], networks[23],
-    //             networks[24], networks[25], networks[26], networks[27]);
+            Encoder(enc_layer[0], enc_layer[1],
+                networks[16], networks[17], networks[18], networks[19],
+                networks[20], networks[21], networks[22], networks[23],
+                networks[24], networks[25], networks[26], networks[27]);
 
-    //         Encoder(enc_layer[1], enc_layer[2],
-    //             networks[28], networks[29], networks[30], networks[31],
-    //             networks[32], networks[33], networks[34], networks[35],
-    //             networks[36], networks[37], networks[38], networks[39]);
+            Encoder(enc_layer[1], enc_layer[2],
+                networks[28], networks[29], networks[30], networks[31],
+                networks[32], networks[33], networks[34], networks[35],
+                networks[36], networks[37], networks[38], networks[39]);
 
-    //         Encoder(enc_layer[2], enc_layer[3],
-    //             networks[40], networks[41], networks[42], networks[43],
-    //             networks[44], networks[45], networks[46], networks[47],
-    //             networks[48], networks[49], networks[50], networks[51]);
+            Encoder(enc_layer[2], enc_layer[3],
+                networks[40], networks[41], networks[42], networks[43],
+                networks[44], networks[45], networks[46], networks[47],
+                networks[48], networks[49], networks[50], networks[51]);
 
-    //         Encoder(enc_layer[3], enc_layer[4],
-    //             networks[52], networks[53], networks[54], networks[55],
-    //             networks[56], networks[57], networks[58], networks[59],
-    //             networks[60], networks[61], networks[62], networks[63]);
+            Encoder(enc_layer[3], enc_layer[4],
+                networks[52], networks[53], networks[54], networks[55],
+                networks[56], networks[57], networks[58], networks[59],
+                networks[60], networks[61], networks[62], networks[63]);
 
-    //         Encoder(enc_layer[4], enc_layer[5],
-    //             networks[64], networks[65], networks[66], networks[67],
-    //             networks[68], networks[69], networks[70], networks[71],
-    //             networks[72], networks[73], networks[74], networks[75]);
+            Encoder(enc_layer[4], enc_layer[5],
+                networks[64], networks[65], networks[66], networks[67],
+                networks[68], networks[69], networks[70], networks[71],
+                networks[72], networks[73], networks[74], networks[75]);
 
-    //         Encoder(enc_layer[5], enc_layer[6],
-    //             networks[76], networks[77], networks[78], networks[79],
-    //             networks[80], networks[81], networks[82], networks[83],
-    //             networks[84], networks[85], networks[86], networks[87]);
+            Encoder(enc_layer[5], enc_layer[6],
+                networks[76], networks[77], networks[78], networks[79],
+                networks[80], networks[81], networks[82], networks[83],
+                networks[84], networks[85], networks[86], networks[87]);
 
-    //         Encoder(enc_layer[6], enc_layer[7],
-    //             networks[88], networks[89], networks[90], networks[91],
-    //             networks[92], networks[93], networks[94], networks[95],
-    //             networks[96], networks[97], networks[98], networks[99]);
+            Encoder(enc_layer[6], enc_layer[7],
+                networks[88], networks[89], networks[90], networks[91],
+                networks[92], networks[93], networks[94], networks[95],
+                networks[96], networks[97], networks[98], networks[99]);
 
-    //         Encoder(enc_layer[7], enc_layer[8],
-    //             networks[100], networks[101], networks[102], networks[103],
-    //             networks[104], networks[105], networks[106], networks[107],
-    //             networks[108], networks[109], networks[110], networks[111]);
+            Encoder(enc_layer[7], enc_layer[8],
+                networks[100], networks[101], networks[102], networks[103],
+                networks[104], networks[105], networks[106], networks[107],
+                networks[108], networks[109], networks[110], networks[111]);
 
-    //         Encoder(enc_layer[8], enc_layer[9],
-    //             networks[112], networks[113], networks[114], networks[115],
-    //             networks[116], networks[117], networks[118], networks[119],
-    //             networks[120], networks[121], networks[122], networks[123]);
+            Encoder(enc_layer[8], enc_layer[9],
+                networks[112], networks[113], networks[114], networks[115],
+                networks[116], networks[117], networks[118], networks[119],
+                networks[120], networks[121], networks[122], networks[123]);
 
-    //         Encoder(enc_layer[9], enc_layer[10],
-    //             networks[124], networks[125], networks[126], networks[127],
-    //             networks[128], networks[129], networks[130], networks[131],
-    //             networks[132], networks[133], networks[134], networks[135]);
+            Encoder(enc_layer[9], enc_layer[10],
+                networks[124], networks[125], networks[126], networks[127],
+                networks[128], networks[129], networks[130], networks[131],
+                networks[132], networks[133], networks[134], networks[135]);
 
-    //         Encoder(enc_layer[10], enc_layer[11],
-    //             networks[136], networks[137], networks[138], networks[139],
-    //             networks[140], networks[141], networks[142], networks[143],
-    //             networks[144], networks[145], networks[146], networks[147]);
-    //     }
+            Encoder(enc_layer[10], enc_layer[11],
+                networks[136], networks[137], networks[138], networks[139],
+                networks[140], networks[141], networks[142], networks[143],
+                networks[144], networks[145], networks[146], networks[147]);
+        }
 
-    //     // normalize
-    //     layer_norm(enc_layer[11], enc_output, networks[148], networks[149]);
+        // normalize
+        layer_norm(enc_layer[11], enc_output, networks[148], networks[149]);
 
-    //     // load class token
-    //     float* cls_token = (float*)malloc(sizeof(float) * EMBED_DIM);
-    //     memcpy(cls_token, enc_output, sizeof(float) * EMBED_DIM);
+        // load class token
+        float* cls_token = (float*)malloc(sizeof(float) * EMBED_DIM);
+        memcpy(cls_token, enc_output, sizeof(float) * EMBED_DIM);
         
-    //     // convert class token into output
-    //     float* cls_output = (float*)malloc(sizeof(float) * NUM_CLASSES);
-    //     linear_layer(
-    //         cls_token, cls_output, 
-    //         1, EMBED_DIM, NUM_CLASSES, 
-    //         networks[150], networks[151]
-    //     );
+        // convert class token into output
+        float* cls_output = (float*)malloc(sizeof(float) * NUM_CLASSES);
+        linear_layer(
+            cls_token, cls_output, 
+            1, EMBED_DIM, NUM_CLASSES, 
+            networks[150], networks[151]
+        );
 
-    //     // sofemax
-    //     Softmax(cls_output, probabilities[i], NUM_CLASSES);
-    // }
+        // sofemax
+        Softmax(cls_output, probabilities[i], NUM_CLASSES);
+    }
 
     cleanup(&container);
+
+    printf(">> [ViT_cl] : ended\n");
 }
 
 
@@ -710,7 +743,10 @@ static void layer_norm (
     Network weight, Network bias
 ) {
     int token = ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE)) + 1;
-    
+    const int total_num_data = token * EMBED_DIM;
+
+
+
     for (int t = 0; t < token; t++) {
         // cal sum, sum_of_square per token
         float sum = 0.0, sum_of_square = 0.0;
@@ -733,6 +769,190 @@ static void layer_norm (
     }
 }
 
+
+float reduce_sum (
+    float* input, 
+    int total_num_data,
+    size_t work_group_size
+) {
+    // work_group_size는 2의 거듭제곱수여야 함
+    assert(((work_group_size & (work_group_size - 1)) == 0));
+
+    // create memory objects
+    size_t input_size = total_num_data * sizeof(float);
+    cl_mem m_input = clCreateBuffer(container.context, CL_MEM_READ_WRITE, input_size, NULL, &err);
+    cl_mem m_output = clCreateBuffer(container.context, CL_MEM_READ_WRITE, input_size, NULL, &err);
+    
+    // write
+    err = clEnqueueWriteBuffer(container.queue, m_input, CL_TRUE, 0, input_size, input, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+
+    int n_data = total_num_data;
+    while (n_data > 1) {
+        // n_grouup = ceil(n_data / work_group_size)
+        int n_group = (n_data + work_group_size - 1) / work_group_size;
+
+        // set kernel args
+        // __kernel void reduce_sum (
+        //     __global float* const g_input,
+        //     __global float* const g_output,
+        //     int n_data,
+        //     __local float* l_sum
+        // ) {
+        KernelArg args[] = {
+            { .size = sizeof(cl_mem), .addr = &m_input},
+            { .size = sizeof(cl_mem), .addr = &m_output},
+            { .size = sizeof(int), .addr = &n_data},
+            { .size = sizeof(float) * work_group_size, .addr = NULL}
+        };
+
+        for (int i=0; i<4; ++i) {
+            err = clSetKernelArg(container.__reduce_sum, i, args[i].size, args[i].addr);
+            CHECK_CL_ERROR(err);
+        }
+
+        // run kernel
+        const size_t global_work_size = n_group * work_group_size;
+        const size_t local_work_size = work_group_size;
+        err = clEnqueueNDRangeKernel(
+            container.queue, container.__reduce_sum, 
+            1, NULL, &global_work_size, &local_work_size, 
+            0, NULL, NULL);
+        CHECK_CL_ERROR(err);
+
+        // swap input and output buffers
+        cl_mem tmp = m_input;
+        m_input = m_output;
+        m_output = tmp;
+
+        // set next value
+        n_data = n_group;
+    }
+
+
+    // read 
+    float result;
+    err = clEnqueueReadBuffer(container.queue, m_input, CL_TRUE, 0, sizeof(float), &result, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+
+    // release memory objects
+    err = clReleaseMemObject(m_input);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_output);
+    CHECK_CL_ERROR(err);
+
+    // return result
+    return result;
+}
+
+
+float reduce_sum_of_square (
+    float* input, 
+    int total_num_data,
+    size_t work_group_size
+) {
+    // work_group_size는 2의 거듭제곱수여야 함
+    assert(((work_group_size & (work_group_size - 1)) == 0));
+
+    cl_event e;
+
+    // create memory objects
+    size_t input_size = total_num_data * sizeof(float);
+    cl_mem m_input = clCreateBuffer(container.context, CL_MEM_READ_WRITE, input_size, NULL, &err);
+    cl_mem m_output = clCreateBuffer(container.context, CL_MEM_READ_WRITE, input_size, NULL, &err);
+    
+    // write
+    err = clEnqueueWriteBuffer(container.queue, m_input, CL_TRUE, 0, input_size, input, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+
+
+    // load square
+    {
+        // set args
+        // __kernel void load_square (
+        //     __global float* g_input
+        // ) {
+        //     size_t global_id = get_global_id(0);
+        //     g_input[global_id] = g_input[global_id] * g_input[global_id];
+        // }
+        KernelArg args[] = {
+             { .size = sizeof(cl_mem), .addr = &m_input},
+        };
+    
+        for (int i=0; i<1; ++i) {
+            err = clSetKernelArg(container.__load_square, i, args[i].size, args[i].addr);
+            CHECK_CL_ERROR(err);
+        }
+
+        // run kernel
+        const size_t global_work_size = total_num_data;
+        err = clEnqueueNDRangeKernel(
+            container.queue, container.__load_square, 
+            1, NULL, &global_work_size, NULL, 
+            0, NULL, NULL);
+        CHECK_CL_ERROR(err);
+    }
+
+
+
+    // reduce sum
+    int n_data = total_num_data;
+    while (n_data > 1) {
+        // n_grouup = ceil(n_data / work_group_size)
+        int n_group = (n_data + work_group_size - 1) / work_group_size;
+
+        // set kernel args
+        // __kernel void reduce_sum (
+        //     __global float* const g_input,
+        //     __global float* const g_output,
+        //     int n_data,
+        //     __local float* l_sum
+        // ) {
+        KernelArg args[] = {
+            { .size = sizeof(cl_mem), .addr = &m_input},
+            { .size = sizeof(cl_mem), .addr = &m_output},
+            { .size = sizeof(int), .addr = &n_data},
+            { .size = sizeof(float) * work_group_size, .addr = NULL}
+        };
+
+        for (int i=0; i<4; ++i) {
+            err = clSetKernelArg(container.__reduce_sum, i, args[i].size, args[i].addr);
+            CHECK_CL_ERROR(err);
+        }
+
+        // run kernel
+        const size_t global_work_size = n_group * work_group_size;
+        const size_t local_work_size = work_group_size;
+        err = clEnqueueNDRangeKernel(
+            container.queue, container.__reduce_sum, 
+            1, NULL, &global_work_size, &local_work_size, 
+            0, NULL, NULL);
+        CHECK_CL_ERROR(err);
+
+        // swap input and output buffers
+        cl_mem tmp = m_input;
+        m_input = m_output;
+        m_output = tmp;
+
+        // set next value
+        n_data = n_group;
+    }
+
+
+    // read 
+    float result;
+    err = clEnqueueReadBuffer(container.queue, m_input, CL_TRUE, 0, sizeof(float), &result, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+
+    // release memory objects
+    err = clReleaseMemObject(m_input);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_output);
+    CHECK_CL_ERROR(err);
+
+    // return result
+    return result;
+}
 
 // do linear transform with input matrix(network)
 static void linear_layer (

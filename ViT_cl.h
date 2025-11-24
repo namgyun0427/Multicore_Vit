@@ -8,6 +8,7 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include <assert.h>
 
 #define CL_TARGET_OPENCL_VERSION 300
 #include <CL/cl.h>
@@ -15,7 +16,46 @@
 #include "Network.h"
 
 
+typedef struct KernelArg {
+    size_t size;
+    const void* addr;
+} KernelArg;
+
+typedef struct CL_container{
+    // default data
+    cl_platform_id platform;
+    cl_device_id device;
+    cl_context context;
+    cl_command_queue queue;
+    cl_program program;
+
+    // kernels
+    cl_kernel __normalize;
+    cl_kernel __reduce_sum;
+    cl_kernel __load_square;
+} CL_container;
+
 void ViT_cl(ImageData* image, Network* networks, float** prb);
+
+static char* get_source_code(const char* file_name, size_t* len);
+
+static void build_error(cl_program program, cl_device_id device, cl_int err);
+
+void init();
+
+void cleanup();
+
+float reduce_sum (
+    float* input, 
+    int total_num_data,
+    size_t work_group_size
+);
+
+float reduce_sum_of_square (
+    float* input, 
+    int total_num_data,
+    size_t work_group_size
+);
 
 static void Conv2d (
     float* input, float* output, 
