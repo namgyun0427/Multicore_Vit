@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = 
-LIBS = -lm
+LIBS = -lm -lOpenCL
 
 DIR_BUILD = build
 DIR_OBJ = $(DIR_BUILD)/obj
