@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = 
-LIBS = -lOpenCL
+LIBS = -lm
 
 DIR_BUILD = build
 DIR_OBJ = $(DIR_BUILD)/obj
@@ -16,7 +16,7 @@ all: $(MAIN_BIN)
 	@echo $(OUT_OBJ)
 
 $(MAIN_BIN): $(OUT_OBJ)
-	$(CC) $(CFLAGS) $(OUT_OBJ) -o $@
+	$(CC) $(CFLAGS) $(OUT_OBJ) -o $@ $(LIBS)
 
 $(DIR_OBJ)/%.o: %.c | $(DIR_OBJ)
 	$(CC) $(CFLAGS) -c $< -o $@

@@ -10,7 +10,6 @@
 #include "Network.h"
 #include "ViT_seq.h"
 #include "comparator.h"
-
 // for linux and mac
 #ifndef _WIN32
     #include "posix_port.h"

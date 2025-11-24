@@ -1,12 +1,6 @@
 #define _CRT_SECURE_NO_WARNINGS
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <math.h>
-
 #include "comparator.h"
-
 // for linux and mac
 #ifndef _WIN32
     #include "posix_port.h"
@@ -16,13 +10,11 @@
 #define BUFFER_SIZE 1024
 #define IMAGE_COUNT 100
 
-// ���ڿ����� index(label)�� probability ����
-int parse_line(const char* line, int* label, float* prob) {
-    // ����: [0] label: 65 / prob: 0.919345)
+
+static int parse_line(const char* line, int* label, float* prob) {
     return sscanf(line, "[%*d] label: %d / prob: %f)", label, prob);
 }
 
-// ���� ����
 static void trim_newline(char* str) {
     size_t len = strlen(str);
     if (len > 0 && str[len - 1] == '\n')

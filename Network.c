@@ -1,9 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
-#include <math.h>  // roundf �Լ��� ����ϱ� ���� �߰�
-
+#include "Network.h"
 // for linux and mac
 #ifdef _WIN32
     #include "dirent.h"
@@ -12,19 +7,22 @@
     #include "posix_port.h"
 #endif
 
-typedef struct {
-    int n;
-    int c;
-    int h;
-    int w;
-    float* data;
-} ImageData;
+////////////////////////////////////////////////////////////////////////////////
+// global variables
 
-typedef struct {
-    float* data;
-    size_t size;
-} Network;
+static double conv2d_t, pos_emb_t, ln1_t, mha_t, ln2_t, mlp_t;
+static double mlp_read, mlp_write, mlp_compute;
+static double mlp1, mlp2;
+static double attn1, attn2, attn3;
+static double attn2_1, attn2_2, attn2_3;
+static time_t start, end;
+static time_t start_t, end_t;
+static time_t start_mlp, end_mlp;
+static time_t start_attn, end_attn;
+static time_t start_2, end_2;
 
+////////////////////////////////////////////////////////////////////////////////
+// functions
 
 ImageData* load_image_data(const char* filename) {
     FILE* f = NULL;
