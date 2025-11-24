@@ -57,6 +57,24 @@ float reduce_sum_of_square (
     size_t work_group_size
 );
 
+void normalize (
+    float* input, 
+    Network weight, 
+    Network bias, 
+    int total_num_data,
+    const float mean,
+    const float inv_std
+);
+
+
+
+
+
+
+
+
+
+
 static void Conv2d (
     float* input, float* output, 
     Network weight, Network bias

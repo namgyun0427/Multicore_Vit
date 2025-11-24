@@ -36,6 +36,17 @@ static cl_int err;
         exit(EXIT_FAILURE); \
     }   \
 
+#define LOG(msg, code) \
+    do {    \
+        clock_t start = clock(); \
+        code;   \
+        clock_t end = clock();  \
+        printf("[");    \
+        printf(msg);    \
+        printf("] (%s:%d)", __FILE__, __LINE__);    \
+        printf(": %.2f sec\n", (double)(end - start) / CLOCKS_PER_SEC); \
+    } while (0);
+
 
 static char* get_source_code(const char* file_name, size_t* len) {
     int unused_ret;
@@ -220,10 +231,7 @@ void ViT_cl (
     float** probabilities
 ) {
     printf(">> [ViT_cl] : start\n");
-
-    init(&container);
-
-    
+    init();
 
     const int token_size = ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE) + 1);
     
@@ -244,23 +252,25 @@ void ViT_cl (
 
 
 
-
+    clock_t start;
     for (int i = 0; i < image->n; i++) {
+        printf("============= processing %d-th iamge =============\n", i);
+
         /*patch embedding*/
         float* patch_embedded = layer[0];
-        Conv2d(image[i].data, patch_embedded, networks[1], networks[2]);
+        LOG("patch_embedded", Conv2d(image[i].data, patch_embedded, networks[1], networks[2]));
 
         /*flatten and transpose*/
         float* flatten_transposed = layer[1];
-        flatten_transpose(patch_embedded, flatten_transposed);
-
+        LOG("flatten_transposed", flatten_transpose(patch_embedded, flatten_transposed));
+        
         /*prepend class token*/
         float* clas_token_prepended = layer[2];
-        class_token(flatten_transposed, clas_token_prepended, networks[0]);
+        LOG("clas_token_prepended", class_token(flatten_transposed, clas_token_prepended, networks[0]));
 
         /*position embedding*/
         float* position_embeded = layer[3];
-        pos_emb(clas_token_prepended, position_embeded, networks[3]);
+        LOG("position_embeded", pos_emb(clas_token_prepended, position_embeded, networks[3]));
 
         /*Encoder - 12 Layers*/
         {
@@ -325,8 +335,10 @@ void ViT_cl (
                 networks[144], networks[145], networks[146], networks[147]);
         }
 
+
         // normalize
         layer_norm(enc_layer[11], enc_output, networks[148], networks[149]);
+
 
         // load class token
         float* cls_token = (float*)malloc(sizeof(float) * EMBED_DIM);
@@ -340,11 +352,12 @@ void ViT_cl (
             networks[150], networks[151]
         );
 
+
         // sofemax
         Softmax(cls_output, probabilities[i], NUM_CLASSES);
     }
 
-    cleanup(&container);
+    cleanup();
 
     printf(">> [ViT_cl] : ended\n");
 }
@@ -485,16 +498,18 @@ static void Encoder(
     Network ln1_w, Network ln1_b, Network attn_w, Network attn_b, Network attn_out_w, Network attn_out_b,
     Network ln2_w, Network ln2_b, Network mlp1_w, Network mlp1_b, Network mlp2_w, Network mlp2_b
 ) {
+    printf(" [Encoder] started\n");
+
     int n_tokens = ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE)) + 1;
     size_t buffer_size = sizeof(float) * n_tokens * EMBED_DIM;
     
     // normalize input
     float* input_normalized = (float*)malloc(buffer_size);
-    layer_norm(input, input_normalized, ln1_w, ln1_b);
+    LOG("input_normalized", layer_norm(input, input_normalized, ln1_w, ln1_b));
     
     // multi-head self attention
     float* attn_out = (float*)malloc(buffer_size);
-    multihead_attn(input_normalized, attn_out, attn_w, attn_b, attn_out_w, attn_out_b);
+    LOG("multi-head self attention", multihead_attn(input_normalized, attn_out, attn_w, attn_b, attn_out_w, attn_out_b));
 
     /*Residual1*/
     // skip-connection
@@ -505,11 +520,11 @@ static void Encoder(
 
     // normalize again
     float* residual_normalized = (float*)malloc(buffer_size);
-    layer_norm(residual, residual_normalized, ln2_w, ln2_b);
+    LOG("residual_normalized", layer_norm(residual, residual_normalized, ln2_w, ln2_b));
 
     /* MLP */
     float* mlp_out = (float*)malloc(buffer_size);
-    mlp_block(residual_normalized, mlp_out, mlp1_w, mlp1_b, mlp2_w, mlp2_b);
+    LOG("MLP", mlp_block(residual_normalized, mlp_out, mlp1_w, mlp1_b, mlp2_w, mlp2_b));
 
     /*Residual2*/
     // skip connection again
@@ -523,6 +538,8 @@ static void Encoder(
     free(residual);
     free(residual_normalized);
     free(mlp_out);
+
+    printf(">> [Encoder] ended\n");
 }
 
 
@@ -745,28 +762,92 @@ static void layer_norm (
     int token = ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE)) + 1;
     const int total_num_data = token * EMBED_DIM;
 
-
-
+    const size_t work_group_size = 1024;
     for (int t = 0; t < token; t++) {
+        const size_t n_data = EMBED_DIM;
+
         // cal sum, sum_of_square per token
-        float sum = 0.0, sum_of_square = 0.0;
-        for (int i = 0; i < EMBED_DIM; i++) {
-            float val = input[t * EMBED_DIM + i];
-            sum += val;
-            sum_of_square += val * val;
-        }
+        float sum = reduce_sum(input, n_data, work_group_size);
+        float sum_of_square = reduce_sum_of_square(input, n_data, work_group_size);
+
+        // printf("%f %d\n", sum , sum_of_square);
         
         // 순차적으로 평균, 분산, 표준편차의 역수 계산
         float mean = sum / EMBED_DIM;
         float var = sum_of_square / EMBED_DIM - mean * mean;
         float inv_std = 1.0f / sqrtf(var + EPSILON);
 
-        // normalize values
-        for (int i = 0; i < EMBED_DIM; i++) {
-            int idx = t * EMBED_DIM + i;
-            output[idx] = ((input[idx] - mean) * inv_std) * weight.data[i] + bias.data[i];
-        }
+        normalize(input, weight, bias, n_data, mean, inv_std);
     }
+}
+
+void normalize (
+    float* input, 
+    Network weight, 
+    Network bias, 
+    int total_num_data,
+    const float mean,
+    const float inv_std
+) {
+    // create memory objects
+    size_t input_size = total_num_data * sizeof(float);
+    cl_mem m_input = clCreateBuffer(container.context, CL_MEM_READ_WRITE, input_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+    cl_mem m_weight = clCreateBuffer(container.context, CL_MEM_READ_ONLY, input_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+    cl_mem m_bias = clCreateBuffer(container.context, CL_MEM_READ_ONLY, input_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+
+    // write
+    err = clEnqueueWriteBuffer(container.queue, m_input, CL_TRUE, 0, input_size, input, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+    err = clEnqueueWriteBuffer(container.queue, m_weight, CL_TRUE, 0, input_size, weight.data, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+    err = clEnqueueWriteBuffer(container.queue, m_bias, CL_TRUE, 0, input_size, bias.data, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+
+
+    // set kernel args
+    // __kernel void normalize(
+    //     __global float* g_input,
+    //     __global const float* g_weight,
+    //     __global const float* g_bias,
+    //     const float MEAN,
+    //     const float INV_STD
+    // ) {
+    KernelArg args[] = {
+        { .size = sizeof(cl_mem), .addr = &m_input},
+        { .size = sizeof(cl_mem), .addr = &m_weight},
+        { .size = sizeof(cl_mem), .addr = &m_bias},
+        { .size = sizeof(float), .addr = &mean},
+        { .size = sizeof(float), .addr = &inv_std}
+    };
+
+    for (int i=0; i<5; ++i) {
+        err = clSetKernelArg(container.__normalize, i, args[i].size, args[i].addr);
+        CHECK_CL_ERROR(err);
+    }
+
+
+    // run kernel
+    const size_t global_work_size = total_num_data;
+    err = clEnqueueNDRangeKernel(
+        container.queue, container.__normalize, 
+        1, NULL, &global_work_size, NULL, 
+        0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+
+    // read result
+    err = clEnqueueReadBuffer(container.queue, m_input, CL_TRUE, 0, input_size, input, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+
+    // release memory objects
+    err = clReleaseMemObject(m_input);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_weight);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_bias);
+    CHECK_CL_ERROR(err);
 }
 
 

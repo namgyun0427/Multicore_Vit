@@ -1,10 +1,11 @@
 __kernel void normalize(
-
+    __global float* g_input,
+    __global const float* g_weight,
+    __global const float* g_bias,
+    const float MEAN,
+    const float INV_STD
 ) {
-    // 일단 토큰 단위로 끊어서 주기
-    // 그럼 sum이랑 sum_of_square구하고
-    // cpu로 구할거 다 구하고
-    // 정규화
+   size_t globla_id = get_global_id(0);
 
-    // reducing하는 커널을 따로 만드는게 좋을지도
+   g_input[globla_id] = ((g_input[globla_id] - MEAN) * INV_STD) * g_weight[globla_id] + g_bias[globla_id];
 }
