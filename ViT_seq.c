@@ -13,14 +13,14 @@
 #define MLP_RATIO 4.0
 #define EPSILON 1e-6
 
-const int size[] = {
+static const int size[] = {
     EMBED_DIM * (IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE), // conv2D
     EMBED_DIM * (IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE), // flatten and transpose
     EMBED_DIM * ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE) + 1), // class token
     EMBED_DIM * ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE) + 1) // position embedding
 };
 
-const int enc_size = EMBED_DIM * ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE) + 1);
+static const int enc_size = EMBED_DIM * ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE) + 1);
 
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -170,7 +170,7 @@ void ViT_seq (
 
 // image patch embedding (convolution)
 // input[IN_CAHNS][PATCH_SIZE][PATCH_SIZE] => output[EMBED_DIM][n_patch_per_image][n_patch_per_image]
-void Conv2d (
+static void Conv2d (
     float* input, float* output, 
     Network weight, Network bias
 ) {
@@ -219,7 +219,7 @@ void Conv2d (
 /* ------------------------------------------------------------------------------ */
 // transpose + flat
 // input[EMBED_DIM][n_patch_per_image][n_patch_per_image] => output[total_num_patches][EMBED_DIM]
-void flatten_transpose (float* input, float* output) {
+static void flatten_transpose (float* input, float* output) {
     int output_size = IMG_SIZE / PATCH_SIZE;
     int num_patches = output_size * output_size;
 
@@ -247,7 +247,7 @@ void flatten_transpose (float* input, float* output) {
 /* ------------------------------------------------------------------------------ */
 // prepend class tokens in front
 // input[total_num_patches][EMBED_DIM] => output[total_num_patches + 1][EMBED_DIM]
-void class_token (
+static void class_token (
     float* patch_tokens, float* final_tokens, 
     Network cls_tk
 ) {
@@ -274,7 +274,7 @@ void class_token (
 /* ------------------------------------------------------------------------------ */
 // add position embedding data
 // input[total_num_patches + 1][EMBED_DIM] => output[total_num_patches + 1][EMBED_DIM]
-void pos_emb (
+static void pos_emb (
     float* input, float* output, 
     Network pos_emb
 ) {
@@ -294,7 +294,7 @@ void pos_emb (
 /* ------------------------------------------------------------------------------ */
 // encode input
 // input[total_num_patches + 1][EMBED_DIM]
-void Encoder(
+static void Encoder(
     float* input, float* output,
     Network ln1_w, Network ln1_b, Network attn_w, Network attn_b, Network attn_out_w, Network attn_out_b,
     Network ln2_w, Network ln2_b, Network mlp1_w, Network mlp1_b, Network mlp2_w, Network mlp2_b
@@ -342,7 +342,7 @@ void Encoder(
 
 // multi-head self attention
 // input[total_num_patches + 1][EMBED_DIM]
-void multihead_attn(
+static void multihead_attn(
     float* input, float* output,
     Network in_weight, Network in_bias, 
     Network out_weight, Network out_bias
@@ -481,7 +481,7 @@ void multihead_attn(
 
 
 // multi-layer perceptron
-void mlp_block (
+static void mlp_block (
     float* input, float* output, 
     Network fc1_weight, Network fc1_bias, 
     Network fc2_weight, Network fc2_bias
@@ -514,7 +514,7 @@ void mlp_block (
 
 
 // GELU function
-float gelu(float x) {
+static float gelu(float x) {
     return 0.5f * x * (1.0f + erff(x / sqrtf(2.0f)));
 }
 
@@ -523,7 +523,7 @@ float gelu(float x) {
 
 /* ------------------------------------------------------------------------------ */
 //
-void Softmax(float* logits, float* probabilities, int length) {
+static void Softmax(float* logits, float* probabilities, int length) {
     // ��ġ �������� ���� �ִ밪 ���
     float max_val = logits[0];
     for (int i = 1; i < length; i++) {
@@ -552,7 +552,7 @@ void Softmax(float* logits, float* probabilities, int length) {
 
 // normalize
 // input[total_num_patches + 1][EMBED_DIM] => output[total_num_patches + 1][EMBED_DIM]
-void layer_norm (
+static void layer_norm (
     float* input, float* output, 
     Network weight, Network bias
 ) {
@@ -582,7 +582,7 @@ void layer_norm (
 
 
 // do linear transform with input matrix(network)
-void linear_layer (
+static void linear_layer (
     float* input, float* output, 
     int tokens, int in_features, int out_features, 
     Network weight, Network bias

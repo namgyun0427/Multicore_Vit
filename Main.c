@@ -8,8 +8,9 @@
 #include <math.h>
 
 #include "Network.h"
-#include "ViT_seq.h"
 #include "comparator.h"
+#include "ViT_seq.h"
+#include "ViT_cl.h"
 // for linux and mac
 #ifndef _WIN32
     #include "posix_port.h"
@@ -21,7 +22,6 @@ const char* imagenet_label[1000] = {
 };
 
 int main() {
-  
     ////////////////////////////////////// Input load //////////////////////////////////////
     const char* img_filename = "./Data/input-100.bin";
     ImageData* images = load_image_data(img_filename);
@@ -55,8 +55,9 @@ int main() {
     time_t start, end;
     start = clock();
 
-    // Input here - ����ó�� �Լ� �ۼ�
-    ViT_seq(images, network, probabilities);
+    // input here
+    ViT_cl(images, network, probabilities);
+    // ViT_seq(images, network, probabilities);
 
     // mod: CLK_TCK (deprecated) => CLOCKS_PER_SEC
     end = clock();
