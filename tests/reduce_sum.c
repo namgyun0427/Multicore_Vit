@@ -7,11 +7,11 @@ int main(void) {
 
     // alloc and calculate sequal result
     float* input = (float*)calloc(n_data, sizeof(float));
-    float sum_seq = 0.0f;
+    float result_seq = 0.0f;
     for (int i=0; i<n_data; ++i) {
         float divident = rand();
         input[i] = divident / divider;
-        sum_seq += input[i];
+        result_seq += input[i];
     }
 
     init();
@@ -22,14 +22,18 @@ int main(void) {
         work_group_size *= 2;
     }
 
-    float sum_cl = reduce_sum(input, n_data, work_group_size);
+    float result_cl = reduce_sum(input, n_data, work_group_size);
 
     cleanup();
 
-    // TODO: compare
-    printf("seq_sum = %f\n", sum_seq);
-    printf("sum_cl = %f\n", sum_cl);
-
-
-    return 0;
+    const float eps = 1e-5;
+    if(fabsf(result_seq - result_cl) > eps) {
+        printf("[reduce_sum_of_square] result_seq != result_cl\n");
+        printf("result_seq = %f\n", result_seq);
+        printf("result_cl = %f\n", result_cl);
+        
+        return 1;
+    } else {
+        return 0;
+    }
 }
