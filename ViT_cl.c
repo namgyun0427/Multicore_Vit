@@ -18,6 +18,8 @@ cl_mem들은 stack식으로 push & pop?
 work_group_size 최대 크기 가져오기?
 */
 
+// TODO: n_token은 상수로 뺄까?
+
 ////////////////////////////////////////////////////////////////////////////////////
 // constants
 
@@ -44,6 +46,7 @@ static const int enc_size = EMBED_DIM * ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / P
 // kernel configuration
 // 커널 개수 알맞게 바꾸고, enum 및 필요 정보 추가
 // Kernels_idxs와 kernel_configs의 순서가 맞아야 함
+
 static const size_t N_KERNEL = 3;
 
 enum Kernels_idxs{
@@ -59,11 +62,13 @@ static Kernel_config kernel_configs[] = {
 };
 
 
+
 /////////////////////////////////////////////////////////////////////////////
 // global variables
 
 static CL_container container;
 static cl_int err;
+
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -409,14 +414,11 @@ static void flatten_transpose (float* input, float* output) {
     int output_size = IMG_SIZE / PATCH_SIZE;
     int num_patches = output_size * output_size;
 
-    // �� ���� ��ġ(oh, ow)�� �ϳ��� ��ġ�� ����Ͽ� patch index ���
     for (int oh = 0; oh < output_size; oh++) {
         for (int ow = 0; ow < output_size; ow++) {
             int patch_idx = oh * output_size + ow;
             for (int oc = 0; oc < EMBED_DIM; oc++) {
-                // ���� �Է��� (oc, oh, ow)
                 int idx_input = (oc * output_size + oh) * output_size + ow;
-                // ���ϴ� ����� (patch_idx, oc)
                 int idx_output = patch_idx * EMBED_DIM + oc;
 
                 // output[patch_idx][EMBED_DIM] == output[oh][ow][EMBED_DIM]
@@ -720,7 +722,6 @@ static float gelu(float x) {
 /* ------------------------------------------------------------------------------ */
 //
 static void Softmax(float* logits, float* probabilities, int length) {
-    // ��ġ �������� ���� �ִ밪 ���
     float max_val = logits[0];
     for (int i = 1; i < length; i++) {
         if (logits[i] > max_val) {
@@ -728,14 +729,12 @@ static void Softmax(float* logits, float* probabilities, int length) {
         }
     }
 
-    // �� ���ҿ� ���� exp(logit - max_val)�� ����ϰ� �ջ�
     float sum_exp = 0.0f;
     for (int i = 0; i < length; i++) {
         probabilities[i] = expf(logits[i] - max_val);
         sum_exp += probabilities[i];
     }
 
-    // Ȯ�������� ����ȭ
     for (int i = 0; i < length; i++) {
         probabilities[i] /= sum_exp;
     }
