@@ -2,6 +2,9 @@
 #ifndef _ViT_cl_H
 #define _ViT_cl_H
 
+/////////////////////////////////////////////////////////////////////////////
+// includes
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -16,10 +19,13 @@
 #include "Network.h"
 
 
-typedef struct KernelArg {
-    size_t size;
-    const void* addr;
-} KernelArg;
+/////////////////////////////////////////////////////////////////////////////
+// structs
+
+typedef struct Kernel_config {
+    const char* const kernel_name;
+    const char* const file_path;
+} Kernel_config;
 
 typedef struct CL_container{
     // default data
@@ -30,16 +36,51 @@ typedef struct CL_container{
     cl_program program;
 
     // kernels
-    cl_kernel __normalize;
-    cl_kernel __reduce_sum;
-    cl_kernel __load_square;
+    size_t n_kernels;
+
+    Kernel_config* kernel_configs;
+    cl_kernel* kernels;
+    char** src_arr;
+    size_t* len_arr;
 } CL_container;
+
+typedef struct KernelArg {
+    size_t size;
+    const void* addr;
+} KernelArg;
+
+
+/////////////////////////////////////////////////////////////////////////////
+// macro function
+
+#define UNUSED(var) \
+    (void)(var);
+
+#define CHECK_CL_ERROR(err) \
+    if (err != CL_SUCCESS) {    \
+        printf("[%s:%d] OpenCL error %d\n", __FILE__, __LINE__, err);   \
+        exit(EXIT_FAILURE); \
+    }   \
+
+#define LOG(msg, code) \
+    do {    \
+        clock_t start = clock(); \
+        code;   \
+        clock_t end = clock();  \
+        printf("[");    \
+        printf(msg);    \
+        printf("] (%s:%d)", __FILE__, __LINE__);    \
+        printf(": %.2f sec\n", (double)(end - start) / CLOCKS_PER_SEC); \
+    } while (0);
+
+/////////////////////////////////////////////////////////////////////////////
+// core function
 
 void ViT_cl(ImageData* image, Network* networks, float** prb);
 
-static char* get_source_code(const char* file_name, size_t* len);
 
-static void build_error(cl_program program, cl_device_id device, cl_int err);
+/////////////////////////////////////////////////////////////////////////////
+// sub functions: 테스트를 위해 외부로 노출
 
 void init();
 
@@ -67,13 +108,12 @@ void normalize (
 );
 
 
+/////////////////////////////////////////////////////////////////////////////
+// sub functions: 테스트 필요가 없다면 외부로 노출 x
 
+static char* get_source_code(const char* file_name, size_t* len);
 
-
-
-
-
-
+static void build_error(cl_program program, cl_device_id device, cl_int err);
 
 static void Conv2d (
     float* input, float* output, 

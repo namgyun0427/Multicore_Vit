@@ -21,6 +21,7 @@ IN_TEST =
 MAIN_OBJ = Main.o
 MAIN_BIN = $(OUT_DIR_BUILD)/main
 
+## TODO: 테스트랑 이것저것
 IN_TEST = 
 
 

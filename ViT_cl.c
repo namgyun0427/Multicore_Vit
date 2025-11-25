@@ -1,52 +1,73 @@
 #pragma warning(disable : 4996)
-#include "ViT_cl.h"
 
+#include "ViT_cl.h"
 
 /*
 [잡생각]
 커널 이름 컨벤션 정해두면 좋을듯 => 일단 지금은 '__'로 시작하는 걸로 통일
-cl 메모리 객체 관련해서도 
-
-커널 배열을 만들고 인덱스만 enum으로 지정?
-커널 관련 필요한 정보 -> 파일 경로, 함수 이름, 소스 길이, 소스 문자열
-상수인 것 -> 커널 파일 경로, 커널 함수 이름
-
-그 뭐냐 부분 실행시간 로깅하는 것도 만들면 좋을듯?
+cl 메모리 객체 관련해서도 => 일단 지금은 "m_"으로 시작하는 경로 통일
+커널을 쓰는 함수에 대해서도 네이밍 컨벤션?
 
 커널 setArg하는 부분에 kenrl 정의부만 복붙?
 
 cl_mem들은 stack식으로 push & pop?
 -> 바로바로 release하는게 좋나? 성능상은?
 
-커널을 쓰는 함수에 대해서도 네이밍 컨벤션?
-
 커널 인자 세팅도 함수로 뺄 수 있나?
 
 work_group_size 최대 크기 가져오기?
 */
 
+////////////////////////////////////////////////////////////////////////////////////
+// constants
 
+#define IMG_SIZE 224
+#define PATCH_SIZE 16
+#define IN_CAHNS 3
+#define NUM_CLASSES 1000
+#define EMBED_DIM 768
+#define NUM_HEADS 12
+#define MLP_RATIO 4.0
+#define EPSILON 1e-6
+
+static const int size[] = {
+    EMBED_DIM * (IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE), // conv2D
+    EMBED_DIM * (IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE), // flatten and transpose
+    EMBED_DIM * ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE) + 1), // class token
+    EMBED_DIM * ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE) + 1) // position embedding
+};
+
+static const int enc_size = EMBED_DIM * ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE) + 1);
+
+
+/////////////////////////////////////////////////////////////////////////////
+// kernel configuration
+// 커널 개수 알맞게 바꾸고, enum 및 필요 정보 추가
+// Kernels_idxs와 kernel_configs의 순서가 맞아야 함
+static const size_t N_KERNEL = 3;
+
+enum Kernels_idxs{
+    __reduce_sum = 0,
+    __load_square,
+    __normalize,
+};
+
+static Kernel_config kernel_configs[] = {
+    { .kernel_name = "reduce_sum", .file_path = "./kernels/reduce_sum.cl" },
+    { .kernel_name = "load_square", .file_path = "./kernels/load_square.cl" },
+    { .kernel_name = "normalize", .file_path = "./kernels/normalize.cl" },
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// global variables
 
 static CL_container container;
 static cl_int err;
 
-#define CHECK_CL_ERROR(err) \
-    if (err != CL_SUCCESS) {    \
-        printf("[%s:%d] OpenCL error %d\n", __FILE__, __LINE__, err);   \
-        exit(EXIT_FAILURE); \
-    }   \
 
-#define LOG(msg, code) \
-    do {    \
-        clock_t start = clock(); \
-        code;   \
-        clock_t end = clock();  \
-        printf("[");    \
-        printf(msg);    \
-        printf("] (%s:%d)", __FILE__, __LINE__);    \
-        printf(": %.2f sec\n", (double)(end - start) / CLOCKS_PER_SEC); \
-    } while (0);
-
+/////////////////////////////////////////////////////////////////////////////
+// cl configuration functions
 
 static char* get_source_code(const char* file_name, size_t* len) {
     int unused_ret;
@@ -111,30 +132,20 @@ void init() {
     container.queue = clCreateCommandQueueWithProperties(container.context, container.device, NULL, &err);
     CHECK_CL_ERROR(err);
 
-
-    // get sources
-    // MEMO: add souces here
-    size_t __normalize_len;
-    const char* const __normalize_filepath = "./kernels/normalize.cl";
-    char* __normalize_src = get_source_code(__normalize_filepath, &__normalize_len);
-
-    size_t __reduce_sum_len;
-    const char* const __reduce_sum_filepath = "./kernels/reduce_sum.cl";
-    char* __reduce_sum_src = get_source_code(__reduce_sum_filepath, &__reduce_sum_len);
-
-    size_t __load_square_len;
-    const char* const __load_square_filepath = "./kernels/load_square.cl";
-    char* __load_square_src = get_source_code(__load_square_filepath, &__load_square_len);
-
-    // MEMO: don't forget to append here
-    char* src_arr[] = { __normalize_src, __reduce_sum_src, __load_square_src };
-    size_t len_arr[] = { __normalize_len, __reduce_sum_len, __load_square_len };
-
-
+    // set kernel configuration
+    container.n_kernels = N_KERNEL;
+    container.kernel_configs = kernel_configs;
+    container.kernels = (cl_kernel*)calloc(container.n_kernels, sizeof(cl_kernel));
+    container.src_arr = (char**)calloc(container.n_kernels, sizeof(char*));
+    container.len_arr = (size_t*)calloc(container.n_kernels, sizeof(size_t));
     
+    // get sources
+    for (int i=0; i<container.n_kernels; ++i) {
+        container.src_arr[i] = get_source_code(container.kernel_configs[i].file_path, &container.len_arr[i]);
+    }
+
     // create program
-    cl_uint n_kernels = 3;
-    container.program = clCreateProgramWithSource(container.context, n_kernels, (const char**)src_arr, len_arr, &err);
+    container.program = clCreateProgramWithSource(container.context, container.n_kernels, (const char**)container.src_arr, container.len_arr, &err);
     CHECK_CL_ERROR(err);
     
     // build program
@@ -142,25 +153,18 @@ void init() {
     build_error(container.program, container.device, err);
 
     // create kernels
-    // MEMO: don't forget to append here
-    const char* const __normalize_name = "normalize";
-    container.__normalize = clCreateKernel(container.program, __normalize_name, &err);
-    CHECK_CL_ERROR(err);
-
-    const char* const __reduce_sum_name = "reduce_sum";
-    container.__reduce_sum = clCreateKernel(container.program, __reduce_sum_name, &err);
-    CHECK_CL_ERROR(err);
-
-    const char* const __load_square_name = "load_square";
-    container.__load_square = clCreateKernel(container.program, __load_square_name, &err);
-    CHECK_CL_ERROR(err);
-
-
+    for (int i=0; i<container.n_kernels; ++i) {
+        container.kernels[i] = clCreateKernel(container.program, container.kernel_configs[i].kernel_name, &err);
+        CHECK_CL_ERROR(err);
+    }
 
     // free sources
     for (int i=0; i<1; ++i) {
-        free(src_arr[i]);
+        free(container.src_arr[i]);
+        container.src_arr[i] = NULL;
     }
+    free(container.src_arr);
+    free(container.len_arr);
 
     printf(">> [init] : ended\n");
 }
@@ -169,9 +173,12 @@ void cleanup() {
     printf(">> [cleanup] : start\n");
 
     // release kernels
-    err = clReleaseKernel(container.__normalize);
-    CHECK_CL_ERROR(err);
+    for (int i=0; i<container.n_kernels; ++i) {
+        err = clReleaseKernel(container.kernels[i]);
+        CHECK_CL_ERROR(err);
+    }
     
+    // release cl objects
     err = clReleaseProgram(container.program);
     CHECK_CL_ERROR(err);
     err = clReleaseCommandQueue(container.queue);
@@ -181,33 +188,14 @@ void cleanup() {
     err = clReleaseDevice(container.device);
     CHECK_CL_ERROR(err);
 
+    // free heap memory
+    free(container.kernel_configs);
+    container.kernel_configs = NULL;
+    free(container.kernels);
+    container.kernels = NULL;
+
     printf(">> [cleanup] : ended\n");
 }
-
-
-////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////
-// constants
-
-#define IMG_SIZE 224
-#define PATCH_SIZE 16
-#define IN_CAHNS 3
-#define NUM_CLASSES 1000
-#define EMBED_DIM 768
-#define NUM_HEADS 12
-#define MLP_RATIO 4.0
-#define EPSILON 1e-6
-
-static const int size[] = {
-    EMBED_DIM * (IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE), // conv2D
-    EMBED_DIM * (IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE), // flatten and transpose
-    EMBED_DIM * ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE) + 1), // class token
-    EMBED_DIM * ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE) + 1) // position embedding
-};
-
-static const int enc_size = EMBED_DIM * ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE) + 1);
 
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -222,7 +210,6 @@ Network networks[152]
     4~147: encoding
     148, 149: normalize
     150, 151: softmax
-
 */
 
 void ViT_cl (
@@ -231,6 +218,7 @@ void ViT_cl (
     float** probabilities
 ) {
     printf(">> [ViT_cl] : start\n");
+
     init();
 
     const int token_size = ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE) + 1);
@@ -251,8 +239,7 @@ void ViT_cl (
     enc_output = (float*)malloc(sizeof(float) * enc_size);
 
 
-
-    clock_t start;
+    // process per image
     for (int i = 0; i < image->n; i++) {
         printf("============= processing %d-th iamge =============\n", i);
 
@@ -498,7 +485,7 @@ static void Encoder(
     Network ln1_w, Network ln1_b, Network attn_w, Network attn_b, Network attn_out_w, Network attn_out_b,
     Network ln2_w, Network ln2_b, Network mlp1_w, Network mlp1_b, Network mlp2_w, Network mlp2_b
 ) {
-    printf(" [Encoder] started\n");
+    printf(">> [Encoder] started\n");
 
     int n_tokens = ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE)) + 1;
     size_t buffer_size = sizeof(float) * n_tokens * EMBED_DIM;
@@ -514,9 +501,12 @@ static void Encoder(
     /*Residual1*/
     // skip-connection
     float* residual = (float*)malloc(buffer_size);
-    for (int i = 0; i < n_tokens * EMBED_DIM; i++) {
-        residual[i] = input[i] + attn_out[i];
-    }
+    LOG(
+        "1st Residual1", 
+        for (int i = 0; i < n_tokens * EMBED_DIM; i++) {
+            residual[i] = input[i] + attn_out[i];
+        }
+    )
 
     // normalize again
     float* residual_normalized = (float*)malloc(buffer_size);
@@ -528,9 +518,12 @@ static void Encoder(
 
     /*Residual2*/
     // skip connection again
-    for (int i = 0; i < n_tokens * EMBED_DIM; i++) {
-        output[i] = residual[i] + mlp_out[i];
-    }
+    LOG(
+        "2nd Residual1", 
+        for (int i = 0; i < n_tokens * EMBED_DIM; i++) {
+            output[i] = residual[i] + mlp_out[i];
+        }
+    )
 
     // wrap up
     free(input_normalized);
@@ -764,9 +757,8 @@ static void layer_norm (
 
     const size_t work_group_size = 1024;
     for (int t = 0; t < token; t++) {
-        const size_t n_data = EMBED_DIM;
-
         // cal sum, sum_of_square per token
+        const size_t n_data = EMBED_DIM;
         float sum = reduce_sum(input, n_data, work_group_size);
         float sum_of_square = reduce_sum_of_square(input, n_data, work_group_size);
 
@@ -824,7 +816,7 @@ void normalize (
     };
 
     for (int i=0; i<5; ++i) {
-        err = clSetKernelArg(container.__normalize, i, args[i].size, args[i].addr);
+        err = clSetKernelArg(container.kernels[__normalize], i, args[i].size, args[i].addr);
         CHECK_CL_ERROR(err);
     }
 
@@ -832,7 +824,7 @@ void normalize (
     // run kernel
     const size_t global_work_size = total_num_data;
     err = clEnqueueNDRangeKernel(
-        container.queue, container.__normalize, 
+        container.queue, container.kernels[__normalize], 
         1, NULL, &global_work_size, NULL, 
         0, NULL, NULL);
     CHECK_CL_ERROR(err);
@@ -888,7 +880,7 @@ float reduce_sum (
         };
 
         for (int i=0; i<4; ++i) {
-            err = clSetKernelArg(container.__reduce_sum, i, args[i].size, args[i].addr);
+            err = clSetKernelArg(container.kernels[__reduce_sum], i, args[i].size, args[i].addr);
             CHECK_CL_ERROR(err);
         }
 
@@ -896,7 +888,7 @@ float reduce_sum (
         const size_t global_work_size = n_group * work_group_size;
         const size_t local_work_size = work_group_size;
         err = clEnqueueNDRangeKernel(
-            container.queue, container.__reduce_sum, 
+            container.queue, container.kernels[__reduce_sum], 
             1, NULL, &global_work_size, &local_work_size, 
             0, NULL, NULL);
         CHECK_CL_ERROR(err);
@@ -935,8 +927,6 @@ float reduce_sum_of_square (
     // work_group_size는 2의 거듭제곱수여야 함
     assert(((work_group_size & (work_group_size - 1)) == 0));
 
-    cl_event e;
-
     // create memory objects
     size_t input_size = total_num_data * sizeof(float);
     cl_mem m_input = clCreateBuffer(container.context, CL_MEM_READ_WRITE, input_size, NULL, &err);
@@ -961,14 +951,14 @@ float reduce_sum_of_square (
         };
     
         for (int i=0; i<1; ++i) {
-            err = clSetKernelArg(container.__load_square, i, args[i].size, args[i].addr);
+            err = clSetKernelArg(container.kernels[__load_square], i, args[i].size, args[i].addr);
             CHECK_CL_ERROR(err);
         }
 
         // run kernel
         const size_t global_work_size = total_num_data;
         err = clEnqueueNDRangeKernel(
-            container.queue, container.__load_square, 
+            container.queue, container.kernels[__load_square], 
             1, NULL, &global_work_size, NULL, 
             0, NULL, NULL);
         CHECK_CL_ERROR(err);
@@ -997,7 +987,7 @@ float reduce_sum_of_square (
         };
 
         for (int i=0; i<4; ++i) {
-            err = clSetKernelArg(container.__reduce_sum, i, args[i].size, args[i].addr);
+            err = clSetKernelArg(container.kernels[__reduce_sum], i, args[i].size, args[i].addr);
             CHECK_CL_ERROR(err);
         }
 
@@ -1005,7 +995,7 @@ float reduce_sum_of_square (
         const size_t global_work_size = n_group * work_group_size;
         const size_t local_work_size = work_group_size;
         err = clEnqueueNDRangeKernel(
-            container.queue, container.__reduce_sum, 
+            container.queue, container.kernels[__reduce_sum], 
             1, NULL, &global_work_size, &local_work_size, 
             0, NULL, NULL);
         CHECK_CL_ERROR(err);
