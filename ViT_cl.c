@@ -194,8 +194,6 @@ void cleanup() {
     CHECK_CL_ERROR(err);
 
     // free heap memory
-    free(container.kernel_configs);
-    container.kernel_configs = NULL;
     free(container.kernels);
     container.kernels = NULL;
 
