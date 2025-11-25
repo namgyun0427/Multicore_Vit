@@ -1,5 +1,3 @@
-#pragma warning(disable : 4996)
-
 #include "ViT_cl.h"
 
 /*
@@ -70,6 +68,62 @@ static CL_container container;
 static cl_int err;
 
 
+/////////////////////////////////////////////////////////////////////////////
+// staic function declaration
+
+static char* get_source_code(const char* file_name, size_t* len);
+
+static void build_error(cl_program program, cl_device_id device, cl_int err);
+
+static void Conv2d (
+    float* input, float* output, 
+    Network weight, Network bias
+);
+
+static void flatten_transpose (float* input, float* output);
+
+static void class_token (
+    float* patch_tokens, float* final_tokens, 
+    Network cls_tk
+);
+
+static void pos_emb (
+    float* input, float* output, 
+    Network pos_emb
+);
+
+static void Encoder(
+    float* input, float* output,
+    Network ln1_w, Network ln1_b, Network attn_w, Network attn_b, Network attn_out_w, Network attn_out_b,
+    Network ln2_w, Network ln2_b, Network mlp1_w, Network mlp1_b, Network mlp2_w, Network mlp2_b
+);
+
+static void multihead_attn(
+    float* input, float* output,
+    Network in_weight, Network in_bias, 
+    Network out_weight, Network out_bias
+);
+
+static void mlp_block (
+    float* input, float* output, 
+    Network fc1_weight, Network fc1_bias, 
+    Network fc2_weight, Network fc2_bias
+);
+
+static float gelu(float x);
+
+static void Softmax(float* logits, float* probabilities, int length);
+
+static void layer_norm (
+    float* input, float* output, 
+    Network weight, Network bias
+);
+
+static void linear_layer (
+    float* input, float* output, 
+    int tokens, int in_features, int out_features, 
+    Network weight, Network bias
+);
 
 /////////////////////////////////////////////////////////////////////////////
 // cl configuration functions
@@ -145,7 +199,7 @@ void init() {
     container.len_arr = (size_t*)calloc(container.n_kernels, sizeof(size_t));
     
     // get sources
-    for (int i=0; i<container.n_kernels; ++i) {
+    for (size_t i=0; i<container.n_kernels; ++i) {
         container.src_arr[i] = get_source_code(container.kernel_configs[i].file_path, &container.len_arr[i]);
     }
 
@@ -158,7 +212,7 @@ void init() {
     build_error(container.program, container.device, err);
 
     // create kernels
-    for (int i=0; i<container.n_kernels; ++i) {
+    for (size_t i=0; i<container.n_kernels; ++i) {
         container.kernels[i] = clCreateKernel(container.program, container.kernel_configs[i].kernel_name, &err);
         CHECK_CL_ERROR(err);
     }
@@ -178,7 +232,7 @@ void cleanup() {
     printf(">> [cleanup] : start\n");
 
     // release kernels
-    for (int i=0; i<container.n_kernels; ++i) {
+    for (size_t i=0; i<container.n_kernels; ++i) {
         err = clReleaseKernel(container.kernels[i]);
         CHECK_CL_ERROR(err);
     }
@@ -220,11 +274,13 @@ void ViT_cl (
     Network* networks, 
     float** probabilities
 ) {
+    const int token_size = ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE) + 1);
+
+    UNUSED(token_size);
+
     printf(">> [ViT_cl] : start\n");
 
     init();
-
-    const int token_size = ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE) + 1);
     
     float* layer[4];
     for (int i = 0; i < 4; i++) {
@@ -411,6 +467,8 @@ static void Conv2d (
 static void flatten_transpose (float* input, float* output) {
     int output_size = IMG_SIZE / PATCH_SIZE;
     int num_patches = output_size * output_size;
+
+    UNUSED(num_patches);
 
     for (int oh = 0; oh < output_size; oh++) {
         for (int ow = 0; ow < output_size; ow++) {
@@ -686,6 +744,8 @@ static void mlp_block (
     int Embed_dim = EMBED_DIM; //768
     int hidden_dim = ((int)(EMBED_DIM * MLP_RATIO)); //3072
 
+    UNUSED(Embed_dim);
+
     float* fc1_out = (float*)malloc(sizeof(float) * tokens * hidden_dim);
     linear_layer(
         input, fc1_out, 
@@ -749,15 +809,17 @@ static void layer_norm (
     float* input, float* output, 
     Network weight, Network bias
 ) {
-    int token = ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE)) + 1;
+    const int token = ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE)) + 1;
     const int total_num_data = token * EMBED_DIM;
+
+    memcpy(output, input, total_num_data * sizeof(float));
 
     const size_t work_group_size = 1024;
     for (int t = 0; t < token; t++) {
         // cal sum, sum_of_square per token
         const size_t n_data = EMBED_DIM;
-        float sum = reduce_sum(input, n_data, work_group_size);
-        float sum_of_square = reduce_sum_of_square(input, n_data, work_group_size);
+        float sum = reduce_sum(output, n_data, work_group_size);
+        float sum_of_square = reduce_sum_of_square(output, n_data, work_group_size);
 
         // printf("%f %d\n", sum , sum_of_square);
         
@@ -766,7 +828,7 @@ static void layer_norm (
         float var = sum_of_square / EMBED_DIM - mean * mean;
         float inv_std = 1.0f / sqrtf(var + EPSILON);
 
-        normalize(input, weight, bias, n_data, mean, inv_std);
+        normalize(output, weight, bias, n_data, mean, inv_std);
     }
 }
 

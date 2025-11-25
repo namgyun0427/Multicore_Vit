@@ -1,5 +1,8 @@
-#pragma warning(disable : 4996)
 #include "ViT_seq.h"
+
+
+#define UNUSED(var) \
+    (void)(var);
 
 ////////////////////////////////////////////////////////////////////////////////////
 // constants
@@ -24,6 +27,62 @@ static const int enc_size = EMBED_DIM * ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / P
 
 
 ////////////////////////////////////////////////////////////////////////////////////
+// static funtion declaration
+
+
+static void Conv2d (
+    float* input, float* output, 
+    Network weight, Network bias
+);
+
+static void flatten_transpose (float* input, float* output);
+
+static void class_token (
+    float* patch_tokens, float* final_tokens, 
+    Network cls_tk
+);
+
+static void pos_emb (
+    float* input, float* output, 
+    Network pos_emb
+);
+
+static void Encoder(
+    float* input, float* output,
+    Network ln1_w, Network ln1_b, Network attn_w, Network attn_b, Network attn_out_w, Network attn_out_b,
+    Network ln2_w, Network ln2_b, Network mlp1_w, Network mlp1_b, Network mlp2_w, Network mlp2_b
+);
+
+static void multihead_attn(
+    float* input, float* output,
+    Network in_weight, Network in_bias, 
+    Network out_weight, Network out_bias
+);
+
+static void mlp_block (
+    float* input, float* output, 
+    Network fc1_weight, Network fc1_bias, 
+    Network fc2_weight, Network fc2_bias
+);
+
+static float gelu(float x);
+
+static void Softmax(float* logits, float* probabilities, int length);
+
+static void layer_norm (
+    float* input, float* output, 
+    Network weight, Network bias
+);
+
+static void linear_layer (
+    float* input, float* output, 
+    int tokens, int in_features, int out_features, 
+    Network weight, Network bias
+);
+
+
+
+////////////////////////////////////////////////////////////////////////////////////
 // core funciton
 
 /*
@@ -44,6 +103,8 @@ void ViT_seq (
     float** probabilities
 ) {
     const int token_size = ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE) + 1);
+
+    UNUSED(token_size);
     
     float* layer[4];
     for (int i = 0; i < 4; i++) {
@@ -223,14 +284,13 @@ static void flatten_transpose (float* input, float* output) {
     int output_size = IMG_SIZE / PATCH_SIZE;
     int num_patches = output_size * output_size;
 
-    // �� ���� ��ġ(oh, ow)�� �ϳ��� ��ġ�� ����Ͽ� patch index ���
+    UNUSED(num_patches);
+
     for (int oh = 0; oh < output_size; oh++) {
         for (int ow = 0; ow < output_size; ow++) {
             int patch_idx = oh * output_size + ow;
             for (int oc = 0; oc < EMBED_DIM; oc++) {
-                // ���� �Է��� (oc, oh, ow)
                 int idx_input = (oc * output_size + oh) * output_size + ow;
-                // ���ϴ� ����� (patch_idx, oc)
                 int idx_output = patch_idx * EMBED_DIM + oc;
 
                 // output[patch_idx][EMBED_DIM] == output[oh][ow][EMBED_DIM]
@@ -489,6 +549,8 @@ static void mlp_block (
     int tokens = ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE)) + 1; //197
     int Embed_dim = EMBED_DIM; //768
     int hidden_dim = ((int)(EMBED_DIM * MLP_RATIO)); //3072
+
+    UNUSED(Embed_dim);
 
     float* fc1_out = (float*)malloc(sizeof(float) * tokens * hidden_dim);
     linear_layer(

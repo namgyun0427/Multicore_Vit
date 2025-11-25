@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -std=gnu17 --pedantic-errors -Wall -Wextra
+CFLAGS = -std=gnu17 --pedantic-errors -Wall -Wextra -Werror
 LIBS = -lm -lOpenCL
 
 ################################################################################################
@@ -20,7 +20,7 @@ IN_OBJ = \
 OUT_OBJ = $(patsubst %.c, $(OUT_DIR_OBJ)/%.o, $(IN_OBJ))
 
 
-IN_BIN = Main.c
+IN_BIN = main.c
 
 OUT_BIN = $(OUT_DIR_BUILD)/main
 

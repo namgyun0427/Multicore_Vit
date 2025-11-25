@@ -11,6 +11,9 @@
 #define IMAGE_COUNT 100
 
 
+static int parse_line(const char* line, int* label, float* prob);
+static void trim_newline(char* str);
+
 static int parse_line(const char* line, int* label, float* prob) {
     return sscanf(line, "[%*d] label: %d / prob: %f)", label, prob);
 }

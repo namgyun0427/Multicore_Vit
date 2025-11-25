@@ -8,9 +8,6 @@
 #include <string.h>
 #include <math.h>
 
-static int parse_line(const char* line, int* label, float* prob);
-static void trim_newline(char* str);
-
 int comparator(void);
 
 #endif // COMPARATOR_H

@@ -10,15 +10,23 @@
 #include <string.h>
 #include <math.h>
 
+// for linux and mac
+#ifdef _WIN32
+    #include "dirent.h"
+#else
+    #include <dirent.h>
+    #include "posix_port.h"
+#endif
+
 typedef struct {
-    int n;      // �̹��� ����
-    int c;      // ä�� ��
-    int h;      // ����
-    int w;      // �ʺ�
-    float* data; // ��� �̹��� �����͸� ���ӵ� �޸� ������ ���� (N x C x H x W)
+    int n;
+    int c;
+    int h;
+    int w;
+    float* data;
 } ImageData;
 
-// Network �ε忡 ���� ����
+
 typedef struct {
     float* data;
     size_t size;
