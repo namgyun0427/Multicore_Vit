@@ -7,14 +7,14 @@ ImageData* load_image_data(const char* filename) {
     FILE* f = NULL;
     errno_t err = fopen_s(&f, filename, "rb");
     if (err != 0) {
-        // ���� ó��: ���� ���⿡ ������ ���
+        // do nithin'
     }
     if (f == NULL) {
         perror("���� ���� ����");
         return NULL;
     }
 
-    // ��� �б�: n, c, h, w
+
     int header[4];
     if (fread(header, sizeof(int), 4, f) != 4) {
         perror("��� �б� ����");

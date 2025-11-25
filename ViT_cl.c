@@ -56,7 +56,7 @@ enum Kernels_idxs{
 static Kernel_config kernel_configs[] = {
     { .kernel_name = "reduce_sum", .file_path = "./kernels/reduce_sum.cl" },
     { .kernel_name = "load_square", .file_path = "./kernels/load_square.cl" },
-    { .kernel_name = "normalize", .file_path = "./kernels/normalize.cl" },
+    { .kernel_name = "my_normalize", .file_path = "./kernels/normalize.cl" },
 };
 
 

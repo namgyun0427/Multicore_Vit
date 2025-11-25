@@ -1,4 +1,4 @@
-__kernel void normalize(
+__kernel void my_normalize(
     __global float* g_input,
     __global const float* g_weight,
     __global const float* g_bias,
