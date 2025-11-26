@@ -10,7 +10,7 @@
 #include "Network.h"
 #include "comparator.h"
 #include "ViT_seq.h"
-// #include "ViT_cl.h"
+#include "ViT_cl.h"
 // for linux and mac
 #ifndef _WIN32
     #include "posix_port.h"
@@ -63,8 +63,8 @@ int main() {
     start = clock();
 
     // input here
-    // ViT_cl(images, network, probabilities);
-    ViT_seq(images, network, probabilities);
+    ViT_cl(images, network, probabilities);
+    // ViT_seq(images, network, probabilities);
 
     // mod: CLK_TCK (deprecated) => CLOCKS_PER_SEC
     end = clock();

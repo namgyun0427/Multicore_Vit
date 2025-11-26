@@ -816,19 +816,20 @@ static void layer_norm (
 
     const size_t work_group_size = 1024;
     for (int t = 0; t < token; t++) {
-        // cal sum, sum_of_square per token
+        float* p_data = output + t * EMBED_DIM;
         const size_t n_data = EMBED_DIM;
-        float sum = reduce_sum(output, n_data, work_group_size);
-        float sum_of_square = reduce_sum_of_square(output, n_data, work_group_size);
-
-        // printf("%f %d\n", sum , sum_of_square);
         
+        // cal sum, sum_of_square per token
+        float sum = reduce_sum(p_data, n_data, work_group_size);
+        float sum_of_square = reduce_sum_of_square(p_data, n_data, work_group_size);
+
         // 순차적으로 평균, 분산, 표준편차의 역수 계산
         float mean = sum / EMBED_DIM;
         float var = sum_of_square / EMBED_DIM - mean * mean;
         float inv_std = 1.0f / sqrtf(var + EPSILON);
 
-        normalize(output, weight, bias, n_data, mean, inv_std);
+        // 정규화
+        normalize(p_data, weight, bias, n_data, mean, inv_std);
     }
 }
 
