@@ -20,6 +20,7 @@
 #define CL_TARGET_OPENCL_VERSION 300
 #include <CL/cl.h>
 
+#include "log.h"
 #include "Network.h"
 
 
@@ -65,17 +66,6 @@ typedef struct KernelArg {
         printf("[%s:%d] OpenCL error %d\n", __FILE__, __LINE__, err);   \
         exit(EXIT_FAILURE); \
     }   \
-
-#define LOG(msg, code) \
-    do {    \
-        clock_t start = clock(); \
-        code;   \
-        clock_t end = clock();  \
-        printf("[");    \
-        printf(msg);    \
-        printf("] (%s:%d)", __FILE__, __LINE__);    \
-        printf(": %.2f sec\n", (double)(end - start) / CLOCKS_PER_SEC); \
-    } while (0);
 
 /////////////////////////////////////////////////////////////////////////////
 // core function

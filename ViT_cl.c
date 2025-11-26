@@ -14,8 +14,18 @@ cl_mem들은 stack식으로 push & pop?
 커널 인자 세팅도 함수로 뺄 수 있나?
 
 work_group_size 최대 크기 가져오기?
+
+완전히 CL로만 바뀌면 인자를 cl_mem으로 서로 넘겨받는게 좋을 듯
+확장성 고려하면 이벤트 등등도 인자로 하는게 좋을지도?
+-> 큐 in-order면 차피 무시되니까 그냥 초장부터 이렇게 하는 게 좋을 듯
+
+함수들 그냥 다 노출시키는 게 좋을 것 같은데 접두사 얘기 해보자
+
+환경변수 인자들 IMG_SIZE 같은 상수들은 따로 공통 헤더 만들어서 뺄까?
+
 */
 
+// TODO: matrix_plus 커널 만들기
 // TODO: n_token은 상수로 뺄까?
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -45,18 +55,20 @@ static const int enc_size = EMBED_DIM * ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / P
 // 커널 개수 알맞게 바꾸고, enum 및 필요 정보 추가
 // Kernels_idxs와 kernel_configs의 순서가 맞아야 함
 
-static const size_t N_KERNEL = 3;
+static const size_t N_KERNEL = 4;
 
 enum Kernels_idxs{
     __reduce_sum = 0,
     __load_square,
     __normalize,
+    __matrix_plus,
 };
 
 static Kernel_config kernel_configs[] = {
     { .kernel_name = "reduce_sum", .file_path = "./kernels/reduce_sum.cl" },
     { .kernel_name = "load_square", .file_path = "./kernels/load_square.cl" },
     { .kernel_name = "my_normalize", .file_path = "./kernels/normalize.cl" },
+    { .kernel_name = "matrix_plus", .file_path = "./kernels/matrix_plus.cl" },
 };
 
 
@@ -124,6 +136,12 @@ static void linear_layer (
     int tokens, int in_features, int out_features, 
     Network weight, Network bias
 );
+
+static void matrix_plus (
+    float* input1, float* input2, float* output, 
+    size_t n_data
+);
+
 
 /////////////////////////////////////////////////////////////////////////////
 // cl configuration functions
@@ -561,10 +579,9 @@ static void Encoder(
     float* residual = (float*)malloc(buffer_size);
     LOG(
         "1st Residual1", 
-        for (int i = 0; i < n_tokens * EMBED_DIM; i++) {
-            residual[i] = input[i] + attn_out[i];
-        }
+        matrix_plus(input, attn_out, residual, n_tokens * EMBED_DIM);
     )
+
 
     // normalize again
     float* residual_normalized = (float*)malloc(buffer_size);
@@ -1102,4 +1119,62 @@ static void linear_layer (
             output[t * out_features + o] = sum;
         }
     }
+}
+
+static void matrix_plus (
+    float* input1, float* input2, float* output, 
+    size_t n_data
+) {
+    // create memory objects
+    size_t buf_size = n_data * sizeof(float);
+    cl_mem m_input1 = clCreateBuffer(container.context, CL_MEM_READ_WRITE, buf_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+    cl_mem m_input2 = clCreateBuffer(container.context, CL_MEM_READ_WRITE, buf_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+    cl_mem m_output = clCreateBuffer(container.context, CL_MEM_READ_WRITE, buf_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+
+    // write inputs
+    err = clEnqueueWriteBuffer(container.queue, m_input1, CL_TRUE, 0, buf_size, input1, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+    err = clEnqueueWriteBuffer(container.queue, m_input2, CL_TRUE, 0, buf_size, input2, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+
+    // set kernel args
+    // __kernel void matrix_plus (
+    //     __global float* g_A,
+    //     __global float* g_B,
+    //     __global float* g_C
+    // ) {
+    KernelArg args[] = {
+        { .size = sizeof(cl_mem), .addr = &m_input1 },
+        { .size = sizeof(cl_mem), .addr = &m_input2 },
+        { .size = sizeof(cl_mem), .addr = &m_output }
+    };
+
+    for (int i=0; i<3; ++i) {
+        err = clSetKernelArg(container.kernels[__matrix_plus], i, args[i].size, args[i].addr);
+        CHECK_CL_ERROR(err);
+    }
+
+    // run kernel
+    size_t gloabl_work_size[] = { n_data };
+    err = clEnqueueNDRangeKernel(
+        container.queue, container.kernels[__matrix_plus], 
+        1, NULL, gloabl_work_size, NULL, 
+        0,NULL, NULL
+    );
+    CHECK_CL_ERROR(err);
+
+    // read reuslt
+    err = clEnqueueReadBuffer(container.queue, m_output, CL_TRUE, 0, buf_size, output, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+
+
+    err = clReleaseMemObject(m_input1);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_input2);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_output);
+    CHECK_CL_ERROR(err);
 }
