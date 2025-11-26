@@ -10,14 +10,14 @@ ImageData* load_image_data(const char* filename) {
         // do nithin'
     }
     if (f == NULL) {
-        perror("���� ���� ����");
+        perror("파일 열기 실패");
         return NULL;
     }
 
 
     int header[4];
     if (fread(header, sizeof(int), 4, f) != 4) {
-        perror("��� �б� ����");
+        perror("헤더 읽기 실패");
         fclose(f);
         return NULL;
     }
@@ -33,12 +33,12 @@ ImageData* load_image_data(const char* filename) {
 
     float* all_data = (float*)malloc(total_elements * sizeof(float));
     if (all_data == NULL) {
-        perror("��ü ������ ���� �޸� �Ҵ� ����");
+        perror("전체 데이터 버퍼 메모리 할당 실패");
         fclose(f);
         return NULL;
     }
     if (fread(all_data, sizeof(float), total_elements, f) != total_elements) {
-        perror("�̹��� ������ �б� ����");
+        perror("이미지 데이터 읽기 실패");
         free(all_data);
         fclose(f);
         return NULL;
@@ -47,7 +47,7 @@ ImageData* load_image_data(const char* filename) {
 
     ImageData* images = (ImageData*)malloc(n * sizeof(ImageData));
     if (images == NULL) {
-        perror("ImageData �迭 �޸� �Ҵ� ����");
+        perror("ImageData 배열 메모리 할당 실패");
         free(all_data);
         return NULL;
     }
@@ -60,7 +60,7 @@ ImageData* load_image_data(const char* filename) {
 
         images[i].data = (float*)malloc(image_size * sizeof(float));
         if (images[i].data == NULL) {
-            perror("���� �̹��� ������ �޸� �Ҵ� ����");
+            perror("개별 이미지 데이터 메모리 할당 실패");
 
             for (int j = 0; j < i; j++) {
                 free(images[j].data);
@@ -106,7 +106,7 @@ static int parse_index_from_filename(const char* filename) {
 void load_weights(const char* directory, Network network[], int count) {
     DIR* dir = opendir(directory);
     if (!dir) {
-        perror("���丮 ���� ����");
+        perror("디렉토리 열기 실패");
         exit(EXIT_FAILURE);
     }
 
@@ -133,14 +133,17 @@ void load_weights(const char* directory, Network network[], int count) {
             continue;
 
         // get filepath
-        char filepath[512];
-        snprintf(filepath, sizeof(filepath), "%s/%s", directory, entry->d_name);
+        // char filepath[512];
+        // snprintf(filepath, sizeof(filepath), "%s/%s", directory, entry->d_name);
+        size_t need = strlen(directory) + 1 + strlen(entry->d_name) + 1;
+        char *filepath = malloc(need);
+        snprintf(filepath, need, "%s/%s", directory, entry->d_name);
 
         // open file
         FILE* fp = NULL;
         errno_t err = fopen_s(&fp, filepath, "rb");
         if (err != 0) {
-            // ���� ó��: ���� ���⿡ ������ ���
+            // do nothin'
         }
 
         // get file_size
@@ -158,7 +161,7 @@ void load_weights(const char* directory, Network network[], int count) {
         // allocate buffer
         float* buffer = (float*)malloc(file_size);
         if (!buffer) {
-            perror("�޸� �Ҵ� ����");
+            perror("메모리 할당 실패");
             fclose(fp);
             exit(EXIT_FAILURE);
         }
@@ -166,7 +169,7 @@ void load_weights(const char* directory, Network network[], int count) {
         // load data into buffer
         size_t read_size = fread(buffer, sizeof(float), num_floats, fp);
         if (read_size != num_floats) {
-            perror("���� �б� ����");
+            perror("파일 읽기 실패");
             free(buffer);
             fclose(fp);
             continue;
@@ -181,6 +184,9 @@ void load_weights(const char* directory, Network network[], int count) {
         // set network values
         network[idx].data = buffer;
         network[idx].size = num_floats;
+
+        // free
+        free(filepath);
     }
 
     closedir(dir);

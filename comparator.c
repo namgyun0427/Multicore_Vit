@@ -8,7 +8,8 @@
 
 // constants
 #define BUFFER_SIZE 1024
-#define IMAGE_COUNT 100
+// #define IMAGE_COUNT 100
+#define IMAGE_COUNT 1
 
 
 static int parse_line(const char* line, int* label, float* prob);
@@ -28,7 +29,7 @@ int comparator(void) {
     FILE* fp_result = NULL;
     FILE* fp_answer = NULL;
     errno_t err1 = fopen_s(&fp_result, "./Data/opencl_result.txt", "r");
-    errno_t err2 = fopen_s(&fp_answer, "./Data/answer_result.txt", "r");
+    errno_t err2 = fopen_s(&fp_answer, "./Data/answer_result_1.txt", "r");
 
     if (err1 != 0 || fp_result == NULL) {
         fprintf(stderr, "Error: Cannot open ./Data/opencl_result.txt\n");
@@ -47,7 +48,7 @@ int comparator(void) {
     for (int line_number = 0; line_number < IMAGE_COUNT; ++line_number) {
         if (fgets(line_result, BUFFER_SIZE, fp_result) == NULL ||
             fgets(line_answer, BUFFER_SIZE, fp_answer) == NULL) {
-            fprintf(stderr, "Line %d: ������ �� ���� ������� �ʽ��ϴ�.\n", line_number);
+            fprintf(stderr, "Line %d: 파일의 줄 수가 충분하지 않습니다.\n", line_number);
             errors++;
             break;
         }
@@ -60,7 +61,7 @@ int comparator(void) {
 
         if (parse_line(line_result, &label_r, &prob_r) != 2 ||
             parse_line(line_answer, &label_a, &prob_a) != 2) {
-            fprintf(stderr, "Line %d: �Ľ� ���� �߻�\n", line_number);
+            fprintf(stderr, "Line %d: 파싱 오류 발생\n", line_number);
             errors++;
             continue;
         }
