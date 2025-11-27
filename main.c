@@ -7,6 +7,7 @@
 #include <time.h>
 #include <math.h> 
 
+#include "constants.h"
 #include "Network.h"
 #include "comparator.h"
 #include "ViT_seq.h"
@@ -28,7 +29,7 @@ const char* imagenet_label[1000] = {
 
 int main() {
     ////////////////////////////////////// Input load //////////////////////////////////////
-    const char* img_filename = "./Data/input-1.bin";
+    const char* img_filename = IMG_FILE_PATH;
     ImageData* images = load_image_data(img_filename);
     if (images == NULL) {
         return 1;

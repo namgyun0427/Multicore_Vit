@@ -20,6 +20,7 @@
 #define CL_TARGET_OPENCL_VERSION 300
 #include <CL/cl.h>
 
+#include "constants.h"
 #include "log.h"
 #include "Network.h"
 
@@ -74,7 +75,7 @@ void ViT_cl(ImageData* image, Network* networks, float** prb);
 
 
 /////////////////////////////////////////////////////////////////////////////
-// sub functions: 테스트를 위해 외부로 노출
+// sub functions
 
 void init();
 
@@ -99,6 +100,72 @@ void normalize (
     int total_num_data,
     const float mean,
     const float inv_std
+);
+
+
+char* v_get_source_code(const char* file_name, size_t* len);
+
+void v_build_error(cl_program program, cl_device_id device, cl_int err);
+
+void v_Conv2d (
+    float* input, float* output, 
+    Network weight, Network bias
+);
+
+void v_flatten_transpose (float* input, float* output);
+
+void v_class_token (
+    float* patch_tokens, float* final_tokens, 
+    Network cls_tk
+);
+
+void v_pos_emb (
+    float* input, float* output, 
+    Network pos_emb
+);
+
+void v_Encoder(
+    float* input, float* output,
+    Network ln1_w, Network ln1_b, Network attn_w, Network attn_b, Network attn_out_w, Network attn_out_b,
+    Network ln2_w, Network ln2_b, Network mlp1_w, Network mlp1_b, Network mlp2_w, Network mlp2_b
+);
+
+void v_multihead_attn(
+    float* input, float* output,
+    Network in_weight, Network in_bias, 
+    Network out_weight, Network out_bias
+);
+
+void v_mlp_block (
+    float* input, float* output, 
+    Network fc1_weight, Network fc1_bias, 
+    Network fc2_weight, Network fc2_bias
+);
+
+float v_gelu(float x);
+
+void v_Softmax(float* logits, float* probabilities, int length);
+
+void v_layer_norm (
+    float* input, float* output, 
+    Network weight, Network bias
+);
+
+void matrix_plus (
+    float* input1, float* input2, float* output, 
+    size_t n_data
+);
+
+// void cl_matrix_plus (
+//     cl_mem m_lvalue, cl_mem m_rvalue, 
+//     size_t n_data, 
+//     cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
+// );
+
+void v_linear_layer (
+    float* input, float* output, 
+    int tokens, int in_features, int out_features, 
+    Network weight, Network bias
 );
 
 #endif // _ViT_cl_H

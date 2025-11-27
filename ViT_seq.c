@@ -7,15 +7,6 @@
 ////////////////////////////////////////////////////////////////////////////////////
 // constants
 
-#define IMG_SIZE 224
-#define PATCH_SIZE 16
-#define IN_CAHNS 3
-#define NUM_CLASSES 1000
-#define EMBED_DIM 768
-#define NUM_HEADS 12
-#define MLP_RATIO 4.0
-#define EPSILON 1e-6
-
 static const int size[] = {
     EMBED_DIM * (IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE), // conv2D
     EMBED_DIM * (IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE), // flatten and transpose
@@ -30,19 +21,19 @@ static const int enc_size = EMBED_DIM * ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / P
 // static funtion declaration
 
 
-static void Conv2d (
+static void v_Conv2d (
     float* input, float* output, 
     Network weight, Network bias
 );
 
-static void flatten_transpose (float* input, float* output);
+static void v_flatten_transpose (float* input, float* output);
 
 static void class_token (
     float* patch_tokens, float* final_tokens, 
     Network cls_tk
 );
 
-static void pos_emb (
+static void v_pos_emb (
     float* input, float* output, 
     Network pos_emb
 );
@@ -65,7 +56,7 @@ static void mlp_block (
     Network fc2_weight, Network fc2_bias
 );
 
-static float gelu(float x);
+static float v_gelu(float x);
 
 static void Softmax(float* logits, float* probabilities, int length);
 
@@ -127,11 +118,11 @@ void ViT_seq (
     for (int i = 0; i < image->n; i++) {
         /*patch embedding*/
         float* patch_embedded = layer[0];
-        Conv2d(image[i].data, patch_embedded, networks[1], networks[2]);
+        v_Conv2d(image[i].data, patch_embedded, networks[1], networks[2]);
 
         /*flatten and transpose*/
         float* flatten_transposed = layer[1];
-        flatten_transpose(patch_embedded, flatten_transposed);
+        v_flatten_transpose(patch_embedded, flatten_transposed);
 
         /*prepend class token*/
         float* clas_token_prepended = layer[2];
@@ -139,7 +130,7 @@ void ViT_seq (
 
         /*position embedding*/
         float* position_embeded = layer[3];
-        pos_emb(clas_token_prepended, position_embeded, networks[3]);
+        v_pos_emb(clas_token_prepended, position_embeded, networks[3]);
 
         /*Encoder - 12 Layers*/
         {
@@ -231,7 +222,7 @@ void ViT_seq (
 
 // image patch embedding (convolution)
 // input[IN_CAHNS][PATCH_SIZE][PATCH_SIZE] => output[EMBED_DIM][n_patch_per_image][n_patch_per_image]
-static void Conv2d (
+static void v_Conv2d (
     float* input, float* output, 
     Network weight, Network bias
 ) {
@@ -280,7 +271,7 @@ static void Conv2d (
 /* ------------------------------------------------------------------------------ */
 // transpose + flat
 // input[EMBED_DIM][n_patch_per_image][n_patch_per_image] => output[total_num_patches][EMBED_DIM]
-static void flatten_transpose (float* input, float* output) {
+static void v_flatten_transpose (float* input, float* output) {
     int output_size = IMG_SIZE / PATCH_SIZE;
     int num_patches = output_size * output_size;
 
@@ -334,7 +325,7 @@ static void class_token (
 /* ------------------------------------------------------------------------------ */
 // add position embedding data
 // input[total_num_patches + 1][EMBED_DIM] => output[total_num_patches + 1][EMBED_DIM]
-static void pos_emb (
+static void v_pos_emb (
     float* input, float* output, 
     Network pos_emb
 ) {
@@ -561,7 +552,7 @@ static void mlp_block (
 
     // apply GELU
     for (int i = 0; i < tokens * hidden_dim; i++) {
-        fc1_out[i] = gelu(fc1_out[i]);
+        fc1_out[i] = v_gelu(fc1_out[i]);
     }
 
     // fc2: (tokens, in_dim)
@@ -576,7 +567,7 @@ static void mlp_block (
 
 
 // GELU function
-static float gelu(float x) {
+static float v_gelu(float x) {
     return 0.5f * x * (1.0f + erff(x / sqrtf(2.0f)));
 }
 

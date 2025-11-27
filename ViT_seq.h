@@ -15,6 +15,7 @@
 #include <math.h>
 #include <time.h>
 
+#include "constants.h"
 #include "Network.h"
 
 void ViT_seq(ImageData* image, Network* networks, float** prb);
