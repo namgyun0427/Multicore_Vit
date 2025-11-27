@@ -3,13 +3,11 @@
 /*
 [잡생각]
 커널 이름 컨벤션 정해두면 좋을듯 => 일단 지금은 '__'로 시작하는 걸로 통일
+v_ 로 시작하게끔 함수이름 변경
 cl 메모리 객체 관련해서도 => 일단 지금은 "m_"으로 시작하는 경로 통일
 커널을 쓰는 함수에 대해서도 네이밍 컨벤션?
 
 커널 setArg하는 부분에 kenrl 정의부만 복붙?
-
-cl_mem들은 stack식으로 push & pop?
--> 바로바로 release하는게 좋나? 성능상은?
 
 커널 인자 세팅도 함수로 뺄 수 있나?
 
@@ -26,6 +24,7 @@ work_group_size 최대 크기 가져오기?
 */
 
 // TODO: n_token은 상수로 뺄까?
+// TODO: v_ 로 시작하게끔 함수이름 변경 + static 떼기
 
 ////////////////////////////////////////////////////////////////////////////////////
 // constants
@@ -54,7 +53,7 @@ static const int enc_size = EMBED_DIM * ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / P
 // 커널 개수 알맞게 바꾸고, enum 및 필요 정보 추가
 // Kernels_idxs와 kernel_configs의 순서가 맞아야 함
 
-#define N_KERNEL 5
+#define N_KERNEL 6
 
 enum Kernels_idxs{
     __reduce_sum = 0,
@@ -62,6 +61,7 @@ enum Kernels_idxs{
     __normalize,
     __matrix_plus,
     __cl_matrix_plus,
+    __linear,
 };
 
 static Kernel_config kernel_configs[N_KERNEL] = {
@@ -70,6 +70,7 @@ static Kernel_config kernel_configs[N_KERNEL] = {
     { .kernel_name = "my_normalize", .file_path = "./kernels/normalize.cl" },
     { .kernel_name = "matrix_plus", .file_path = "./kernels/matrix_plus.cl" },
     { .kernel_name = "cl_matrix_plus", .file_path = "./kernels/cl_matrix_plus.cl" },
+    { .kernel_name = "linear", .file_path = "./kernels/linear.cl" },
 };
 
 
@@ -132,21 +133,27 @@ static void layer_norm (
     Network weight, Network bias
 );
 
-static void linear_layer (
-    float* input, float* output, 
-    int tokens, int in_features, int out_features, 
-    Network weight, Network bias
-);
+// static void linear_layer (
+//     float* input, float* output, 
+//     int tokens, int in_features, int out_features, 
+//     Network weight, Network bias
+// );
 
 static void matrix_plus (
     float* input1, float* input2, float* output, 
     size_t n_data
 );
 
-static void cl_matrix_plus (
-    cl_mem m_lvalue, cl_mem m_rvalue, 
-    size_t n_data, 
-    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
+// static void cl_matrix_plus (
+//     cl_mem m_lvalue, cl_mem m_rvalue, 
+//     size_t n_data, 
+//     cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
+// );
+
+void v_linear_layer (
+    float* input, float* output, 
+    int tokens, int in_features, int out_features, 
+    Network weight, Network bias
 );
 
 
@@ -417,7 +424,7 @@ void ViT_cl (
         
         // convert class token into output
         float* cls_output = (float*)malloc(sizeof(float) * NUM_CLASSES);
-        linear_layer(
+        v_linear_layer(
             cls_token, cls_output, 
             1, EMBED_DIM, NUM_CLASSES, 
             networks[150], networks[151]
@@ -637,15 +644,25 @@ static void multihead_attn(
     // calculate Q, K, V per token
     for (int t = 0; t < n_tokens; t++) {
         for (int i = 0; i < EMBED_DIM; i++) {
-            // run kenrl gemm for Q -> e1
-            // e1 -> run kenel matrix_plus for Q -> e2
-            // run kernel K -> e
-            // run kernel V ->e
+            // set bias as initial value
+            float sum_q = in_bias.data[Q_dim + i];
+            float sum_k = in_bias.data[K_dim + i];
+            float sum_v = in_bias.data[V_dim + i];
+
+            // do calculation
+            for (int j = 0; j < EMBED_DIM; j++) {
+                // sum_q += input[t][j] * in_weight.data[Q_dim + i][j] 이런 식
+                sum_q += input[t * EMBED_DIM + j] * in_weight.data[(Q_dim + i) * EMBED_DIM + j];
+                sum_k += input[t * EMBED_DIM + j] * in_weight.data[(K_dim + i) * EMBED_DIM + j];
+                sum_v += input[t * EMBED_DIM + j] * in_weight.data[(V_dim + i) * EMBED_DIM + j];
+            }
+
+            // store results
+            Q[t * EMBED_DIM + i] = sum_q;
+            K[t * EMBED_DIM + i] = sum_k;
+            V[t * EMBED_DIM + i] = sum_v;
         }
-        // clWaitForEvents(...);
     }
-    
-    // clWaitForEvents();
 
 
 
@@ -761,7 +778,7 @@ static void mlp_block (
     UNUSED(Embed_dim);
 
     float* fc1_out = (float*)malloc(sizeof(float) * tokens * hidden_dim);
-    linear_layer(
+    v_linear_layer(
         input, fc1_out, 
         tokens, EMBED_DIM, hidden_dim, 
         fc1_weight, fc1_bias
@@ -773,7 +790,7 @@ static void mlp_block (
     }
 
     // fc2: (tokens, in_dim)
-    linear_layer(
+    v_linear_layer(
         fc1_out, output, 
         tokens, hidden_dim, EMBED_DIM, 
         fc2_weight, fc2_bias
@@ -1100,22 +1117,101 @@ float reduce_sum_of_square (
 }
 
 // do linear transform with input matrix(network)
-static void linear_layer (
+// static void linear_layer (
+//     float* input, float* output, 
+//     int tokens, int in_features, int out_features, 
+//     Network weight, Network bias
+// ) {
+//     for (int t = 0; t < tokens; t++) {
+//         for (int o = 0; o < out_features; o++) {
+//             float sum = bias.data[o];
+
+//             for (int i = 0; i < in_features; i++) {
+//                 sum += input[t * in_features + i] * weight.data[o * in_features + i];
+//             }
+
+//             output[t * out_features + o] = sum;
+//         }
+//     }
+// }
+
+void v_linear_layer (
     float* input, float* output, 
     int tokens, int in_features, int out_features, 
     Network weight, Network bias
 ) {
-    for (int t = 0; t < tokens; t++) {
-        for (int o = 0; o < out_features; o++) {
-            float sum = bias.data[o];
+    const cl_kernel k = container.kernels[__linear];
 
-            for (int i = 0; i < in_features; i++) {
-                sum += input[t * in_features + i] * weight.data[o * in_features + i];
-            }
+    // create mem obj
 
-            output[t * out_features + o] = sum;
-        }
+    // input = [tokens x in_features]
+    const size_t input_size = tokens * in_features * sizeof(float);
+    cl_mem m_input = clCreateBuffer(container.context, CL_MEM_READ_WRITE, input_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+    
+    // weight = [out_features x in_features]
+    const size_t weight_size = out_features * in_features * sizeof(float);
+    cl_mem m_weight = clCreateBuffer(container.context, CL_MEM_READ_WRITE, weight_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+
+    // m_bias = [1 x out_features]
+    const size_t bias_size = out_features * sizeof(float);
+    cl_mem m_bias = clCreateBuffer(container.context, CL_MEM_READ_WRITE, bias_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+    
+    // output = [tokens x out_features]
+    const size_t output_size = tokens * out_features * sizeof(float);
+    cl_mem m_output = clCreateBuffer(container.context, CL_MEM_READ_WRITE, output_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+
+
+
+    // write
+    err = clEnqueueWriteBuffer(container.queue, m_input, CL_TRUE, 0, input_size, input, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+    err = clEnqueueWriteBuffer(container.queue, m_weight, CL_TRUE, 0, weight_size, weight.data, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+    err = clEnqueueWriteBuffer(container.queue, m_bias, CL_TRUE, 0, bias_size, bias.data, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+
+
+    // set kenrl args
+    // __kernel void linear(
+    // 	__global const float* g_input,
+    // 	__global const float* g_weight,
+    // 	__global const float* g_bias,
+    // 	__global float* g_output,
+    // 	const int tokens,
+    // 	const int in_features,
+    // 	const int out_features
+    // ) {
+    KernelArg args[] = {
+        { .size = sizeof(cl_mem), .addr = &m_input },
+        { .size = sizeof(cl_mem), .addr = &m_weight },
+        { .size = sizeof(cl_mem), .addr = &m_bias },
+        { .size = sizeof(cl_mem), .addr = &m_output },
+        { .size = sizeof(int), .addr = &tokens },
+        { .size = sizeof(int), .addr = &in_features },
+        { .size = sizeof(int), .addr = &out_features },
+    };
+
+    for (int i=0; i<7; ++i) {
+        err = clSetKernelArg(k, i, args[i].size, args[i].addr);
+        CHECK_CL_ERROR(err);
     }
+
+    // run kernel
+    const size_t gloabal_work_size[] = { tokens, out_features };
+    err = clEnqueueNDRangeKernel(
+        container.queue, k,
+        2, NULL, gloabal_work_size, NULL,
+        0, NULL, NULL
+    );
+    CHECK_CL_ERROR(err);
+
+    // read result
+    err = clEnqueueReadBuffer(container.queue, m_output, CL_TRUE, 0, output_size, output, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
 }
 
 static void matrix_plus (
@@ -1257,34 +1353,34 @@ static void matrix_plus (
 
 
 // 행렬덧셈: m_lvalue += m_rvalue
-static void cl_matrix_plus (
-    cl_mem m_lvalue, cl_mem m_rvalue, 
-    size_t n_data,
-    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
-) {
-    cl_kernel target_kernel = container.kernels[__cl_matrix_plus];
+// static void cl_matrix_plus (
+//     cl_mem m_lvalue, cl_mem m_rvalue, 
+//     size_t n_data,
+//     cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
+// ) {
+//     cl_kernel target_kernel = container.kernels[__cl_matrix_plus];
 
-    // set kernel args
-    // __kernel void cl_matrix_plus (
-    //     __global float* g_lvalue,
-    //     __global float* g_rvalue
-    // ) {
-    KernelArg args[] = {
-        { .size = sizeof(cl_mem), .addr = &m_lvalue },
-        { .size = sizeof(cl_mem), .addr = &m_rvalue },
-    };
+//     // set kernel args
+//     // __kernel void cl_matrix_plus (
+//     //     __global float* g_lvalue,
+//     //     __global float* g_rvalue
+//     // ) {
+//     KernelArg args[] = {
+//         { .size = sizeof(cl_mem), .addr = &m_lvalue },
+//         { .size = sizeof(cl_mem), .addr = &m_rvalue },
+//     };
 
-    for (int i=0; i<2; ++i) {
-        err = clSetKernelArg(target_kernel, i, args[i].size, args[i].addr);
-        CHECK_CL_ERROR(err);
-    }
+//     for (int i=0; i<2; ++i) {
+//         err = clSetKernelArg(target_kernel, i, args[i].size, args[i].addr);
+//         CHECK_CL_ERROR(err);
+//     }
 
-    // run kernel
-    size_t gloabl_work_size[] = { n_data };
-    err = clEnqueueNDRangeKernel(
-        container.queue, target_kernel, 
-        1, NULL, gloabl_work_size, NULL, 
-        e_num_waiting, e_waiting_arr, e_out
-    );
-    CHECK_CL_ERROR(err);
-}
+//     // run kernel
+//     size_t gloabl_work_size[] = { n_data };
+//     err = clEnqueueNDRangeKernel(
+//         container.queue, target_kernel, 
+//         1, NULL, gloabl_work_size, NULL, 
+//         e_num_waiting, e_waiting_arr, e_out
+//     );
+//     CHECK_CL_ERROR(err);
+// }
