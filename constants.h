@@ -11,13 +11,17 @@
     #define MLP_RATIO 4.0
     #define EPSILON 1e-6
 
-    
-    #define IMAGE_COUNT 100
-    #define IMG_FILE_PATH "./Data/input-100.bin" 
-    #define ANSER_FILE_PATH "./Data/answer_result.txt"
-    
-    // #define IMAGE_COUNT 1
-    // #define IMG_FILE_PATH "./Data/input-1.bin" 
-    // #define ANSER_FILE_PATH "./Data/answer_result_1.txt"
+    // comment this to process one img
+    // #define SWITCH_100
+
+    #ifdef SWITCH_100
+        #define IMAGE_COUNT 100
+        #define IMG_FILE_PATH "./Data/input-100.bin" 
+        #define ANSER_FILE_PATH "./Data/answer_result.txt"
+    #else
+        #define IMAGE_COUNT 1
+        #define IMG_FILE_PATH "./Data/input-1.bin" 
+        #define ANSER_FILE_PATH "./Data/answer_result_1.txt"
+    #endif
 
 #endif // _CONSTANTS_H

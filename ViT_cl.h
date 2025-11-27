@@ -163,9 +163,9 @@ void matrix_plus (
 // );
 
 void v_linear_layer (
-    float* input, float* output, 
-    int tokens, int in_features, int out_features, 
-    Network weight, Network bias
+    cl_mem m_input, cl_mem m_weight, cl_mem m_bias, cl_mem m_output, 
+    int tokens, int in_features, int out_features,
+    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
 );
 
 #endif // _ViT_cl_H
