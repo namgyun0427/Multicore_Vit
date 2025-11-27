@@ -1,0 +1,110 @@
+=====================Start========================
+>> [ViT_cl] : start
+>> [init] : start
+>> [init] : ended
+============= processing 0-th iamge =============
+patch_embedded, ViT_cl.c:339, 674.06
+flatten_transposed, ViT_cl.c:343, 0.91
+clas_token_prepended, ViT_cl.c:347, 0.53
+position_embeded, ViT_cl.c:351, 0.72
+>> [Encoder] started
+input_normalized, ViT_cl.c:585, 95.11
+multi-head self attention, ViT_cl.c:589, 1550.83
+1st Residual1, ViT_cl.c:594, 1.02
+residual_normalized, ViT_cl.c:602, 82.90
+MLP, ViT_cl.c:606, 2796.67
+2nd Residual1, ViT_cl.c:610, 0.61
+>> [Encoder] ended
+>> [Encoder] started
+input_normalized, ViT_cl.c:585, 81.67
+multi-head self attention, ViT_cl.c:589, 1571.72
+1st Residual1, ViT_cl.c:594, 1.18
+residual_normalized, ViT_cl.c:602, 95.66
+MLP, ViT_cl.c:606, 2803.98
+2nd Residual1, ViT_cl.c:610, 0.70
+>> [Encoder] ended
+>> [Encoder] started
+input_normalized, ViT_cl.c:585, 83.96
+multi-head self attention, ViT_cl.c:589, 2574.27
+1st Residual1, ViT_cl.c:594, 1.25
+residual_normalized, ViT_cl.c:602, 122.30
+MLP, ViT_cl.c:606, 3207.36
+2nd Residual1, ViT_cl.c:610, 0.67
+>> [Encoder] ended
+>> [Encoder] started
+input_normalized, ViT_cl.c:585, 87.03
+multi-head self attention, ViT_cl.c:589, 1587.28
+1st Residual1, ViT_cl.c:594, 1.05
+residual_normalized, ViT_cl.c:602, 82.82
+MLP, ViT_cl.c:606, 2812.94
+2nd Residual1, ViT_cl.c:610, 0.93
+>> [Encoder] ended
+>> [Encoder] started
+input_normalized, ViT_cl.c:585, 83.77
+multi-head self attention, ViT_cl.c:589, 1566.49
+1st Residual1, ViT_cl.c:594, 1.04
+residual_normalized, ViT_cl.c:602, 87.41
+MLP, ViT_cl.c:606, 3879.57
+2nd Residual1, ViT_cl.c:610, 0.92
+>> [Encoder] ended
+>> [Encoder] started
+input_normalized, ViT_cl.c:585, 125.78
+multi-head self attention, ViT_cl.c:589, 1895.71
+1st Residual1, ViT_cl.c:594, 1.03
+residual_normalized, ViT_cl.c:602, 84.19
+MLP, ViT_cl.c:606, 2806.49
+2nd Residual1, ViT_cl.c:610, 0.66
+>> [Encoder] ended
+>> [Encoder] started
+input_normalized, ViT_cl.c:585, 83.06
+multi-head self attention, ViT_cl.c:589, 1536.35
+1st Residual1, ViT_cl.c:594, 1.04
+residual_normalized, ViT_cl.c:602, 82.92
+MLP, ViT_cl.c:606, 2809.47
+2nd Residual1, ViT_cl.c:610, 0.68
+>> [Encoder] ended
+>> [Encoder] started
+input_normalized, ViT_cl.c:585, 83.38
+multi-head self attention, ViT_cl.c:589, 1738.91
+1st Residual1, ViT_cl.c:594, 1.11
+residual_normalized, ViT_cl.c:602, 110.98
+MLP, ViT_cl.c:606, 3969.66
+2nd Residual1, ViT_cl.c:610, 0.65
+>> [Encoder] ended
+>> [Encoder] started
+input_normalized, ViT_cl.c:585, 82.17
+multi-head self attention, ViT_cl.c:589, 1538.88
+1st Residual1, ViT_cl.c:594, 0.96
+residual_normalized, ViT_cl.c:602, 85.35
+MLP, ViT_cl.c:606, 2803.96
+2nd Residual1, ViT_cl.c:610, 0.67
+>> [Encoder] ended
+>> [Encoder] started
+input_normalized, ViT_cl.c:585, 82.92
+multi-head self attention, ViT_cl.c:589, 1552.48
+1st Residual1, ViT_cl.c:594, 0.98
+residual_normalized, ViT_cl.c:602, 82.55
+MLP, ViT_cl.c:606, 3022.70
+2nd Residual1, ViT_cl.c:610, 0.96
+>> [Encoder] ended
+>> [Encoder] started
+input_normalized, ViT_cl.c:585, 111.56
+multi-head self attention, ViT_cl.c:589, 2743.14
+1st Residual1, ViT_cl.c:594, 1.02
+residual_normalized, ViT_cl.c:602, 95.03
+MLP, ViT_cl.c:606, 2806.69
+2nd Residual1, ViT_cl.c:610, 0.68
+>> [Encoder] ended
+>> [Encoder] started
+input_normalized, ViT_cl.c:585, 82.98
+multi-head self attention, ViT_cl.c:589, 1554.70
+1st Residual1, ViT_cl.c:594, 1.13
+residual_normalized, ViT_cl.c:602, 85.09
+MLP, ViT_cl.c:606, 2804.52
+2nd Residual1, ViT_cl.c:610, 0.67
+>> [Encoder] ended
+>> [cleanup] : start
+>> [cleanup] : ended
+>> [ViT_cl] : ended
+Elapsed time: 61.14 sec
+Comparator: 두 파일의 내용이 동일합니다.

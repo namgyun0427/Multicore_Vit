@@ -1,0 +1,226 @@
+=====================Start========================
+>> [ViT_cl] : start
+>> [init] : start
+>> [init] : ended
+============= processing 0-th iamge =============
+[patch_embedded] (ViT_cl.c:336): 0.58 sec
+[flatten_transposed] (ViT_cl.c:340): 0.00 sec
+[clas_token_prepended] (ViT_cl.c:344): 0.00 sec
+[position_embeded] (ViT_cl.c:348): 0.00 sec
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.09 sec
+[multi-head self attention] (ViT_cl.c:587): 2.39 sec
+[residual_normalized] (ViT_cl.c:598): 0.11 sec
+[MLP] (ViT_cl.c:602): 3.17 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.10 sec
+[multi-head self attention] (ViT_cl.c:587): 1.53 sec
+[residual_normalized] (ViT_cl.c:598): 0.09 sec
+[MLP] (ViT_cl.c:602): 2.76 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.08 sec
+[multi-head self attention] (ViT_cl.c:587): 1.53 sec
+[residual_normalized] (ViT_cl.c:598): 0.08 sec
+[MLP] (ViT_cl.c:602): 3.37 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.11 sec
+[multi-head self attention] (ViT_cl.c:587): 2.19 sec
+[residual_normalized] (ViT_cl.c:598): 0.08 sec
+[MLP] (ViT_cl.c:602): 2.80 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.08 sec
+[multi-head self attention] (ViT_cl.c:587): 1.53 sec
+[residual_normalized] (ViT_cl.c:598): 0.08 sec
+[MLP] (ViT_cl.c:602): 2.75 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.08 sec
+[multi-head self attention] (ViT_cl.c:587): 1.54 sec
+[residual_normalized] (ViT_cl.c:598): 0.08 sec
+[MLP] (ViT_cl.c:602): 3.93 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.08 sec
+[multi-head self attention] (ViT_cl.c:587): 1.55 sec
+[residual_normalized] (ViT_cl.c:598): 0.08 sec
+[MLP] (ViT_cl.c:602): 2.86 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.08 sec
+[multi-head self attention] (ViT_cl.c:587): 1.54 sec
+[residual_normalized] (ViT_cl.c:598): 0.09 sec
+[MLP] (ViT_cl.c:602): 2.76 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.08 sec
+[multi-head self attention] (ViT_cl.c:587): 2.74 sec
+[residual_normalized] (ViT_cl.c:598): 0.12 sec
+[MLP] (ViT_cl.c:602): 2.90 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.08 sec
+[multi-head self attention] (ViT_cl.c:587): 1.54 sec
+[residual_normalized] (ViT_cl.c:598): 0.08 sec
+[MLP] (ViT_cl.c:602): 2.78 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.08 sec
+[multi-head self attention] (ViT_cl.c:587): 1.54 sec
+[residual_normalized] (ViT_cl.c:598): 0.08 sec
+[MLP] (ViT_cl.c:602): 3.65 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.11 sec
+[multi-head self attention] (ViT_cl.c:587): 1.86 sec
+[residual_normalized] (ViT_cl.c:598): 0.09 sec
+[MLP] (ViT_cl.c:602): 2.76 sec
+>> [Encoder] ended
+============= processing 1-th iamge =============
+[patch_embedded] (ViT_cl.c:336): 0.58 sec
+[flatten_transposed] (ViT_cl.c:340): 0.00 sec
+[clas_token_prepended] (ViT_cl.c:344): 0.00 sec
+[position_embeded] (ViT_cl.c:348): 0.00 sec
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.08 sec
+[multi-head self attention] (ViT_cl.c:587): 1.53 sec
+[residual_normalized] (ViT_cl.c:598): 0.09 sec
+[MLP] (ViT_cl.c:602): 2.76 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.08 sec
+[multi-head self attention] (ViT_cl.c:587): 2.12 sec
+[residual_normalized] (ViT_cl.c:598): 0.11 sec
+[MLP] (ViT_cl.c:602): 3.42 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.08 sec
+[multi-head self attention] (ViT_cl.c:587): 1.54 sec
+[residual_normalized] (ViT_cl.c:598): 0.08 sec
+[MLP] (ViT_cl.c:602): 2.77 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.08 sec
+[multi-head self attention] (ViT_cl.c:587): 1.54 sec
+[residual_normalized] (ViT_cl.c:598): 0.08 sec
+[MLP] (ViT_cl.c:602): 3.21 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.12 sec
+[multi-head self attention] (ViT_cl.c:587): 2.42 sec
+[residual_normalized] (ViT_cl.c:598): 0.08 sec
+[MLP] (ViT_cl.c:602): 2.76 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.08 sec
+[multi-head self attention] (ViT_cl.c:587): 1.54 sec
+[residual_normalized] (ViT_cl.c:598): 0.08 sec
+[MLP] (ViT_cl.c:602): 2.77 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.08 sec
+[multi-head self attention] (ViT_cl.c:587): 1.54 sec
+[residual_normalized] (ViT_cl.c:598): 0.08 sec
+[MLP] (ViT_cl.c:602): 3.94 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.08 sec
+[multi-head self attention] (ViT_cl.c:587): 1.53 sec
+[residual_normalized] (ViT_cl.c:598): 0.08 sec
+[MLP] (ViT_cl.c:602): 2.81 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.09 sec
+[multi-head self attention] (ViT_cl.c:587): 1.54 sec
+[residual_normalized] (ViT_cl.c:598): 0.08 sec
+[MLP] (ViT_cl.c:602): 2.75 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.08 sec
+[multi-head self attention] (ViT_cl.c:587): 2.35 sec
+[residual_normalized] (ViT_cl.c:598): 0.11 sec
+[MLP] (ViT_cl.c:602): 3.23 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.08 sec
+[multi-head self attention] (ViT_cl.c:587): 1.54 sec
+[residual_normalized] (ViT_cl.c:598): 0.09 sec
+[MLP] (ViT_cl.c:602): 2.75 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.08 sec
+[multi-head self attention] (ViT_cl.c:587): 1.54 sec
+[residual_normalized] (ViT_cl.c:598): 0.08 sec
+[MLP] (ViT_cl.c:602): 3.35 sec
+>> [Encoder] ended
+============= processing 2-th iamge =============
+[patch_embedded] (ViT_cl.c:336): 1.03 sec
+[flatten_transposed] (ViT_cl.c:340): 0.00 sec
+[clas_token_prepended] (ViT_cl.c:344): 0.00 sec
+[position_embeded] (ViT_cl.c:348): 0.00 sec
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.12 sec
+[multi-head self attention] (ViT_cl.c:587): 1.65 sec
+[residual_normalized] (ViT_cl.c:598): 0.08 sec
+[MLP] (ViT_cl.c:602): 2.76 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.08 sec
+[multi-head self attention] (ViT_cl.c:587): 1.53 sec
+[residual_normalized] (ViT_cl.c:598): 0.08 sec
+[MLP] (ViT_cl.c:602): 2.77 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.08 sec
+[multi-head self attention] (ViT_cl.c:587): 1.77 sec
+[residual_normalized] (ViT_cl.c:598): 0.11 sec
+[MLP] (ViT_cl.c:602): 3.72 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.09 sec
+[multi-head self attention] (ViT_cl.c:587): 1.53 sec
+[residual_normalized] (ViT_cl.c:598): 0.08 sec
+[MLP] (ViT_cl.c:602): 2.79 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.08 sec
+[multi-head self attention] (ViT_cl.c:587): 1.54 sec
+[residual_normalized] (ViT_cl.c:598): 0.08 sec
+[MLP] (ViT_cl.c:602): 2.86 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.11 sec
+[multi-head self attention] (ViT_cl.c:587): 2.78 sec
+[residual_normalized] (ViT_cl.c:598): 0.09 sec
+[MLP] (ViT_cl.c:602): 2.76 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.09 sec
+[multi-head self attention] (ViT_cl.c:587): 1.54 sec
+[residual_normalized] (ViT_cl.c:598): 0.08 sec
+[MLP] (ViT_cl.c:602): 2.74 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.08 sec
+[multi-head self attention] (ViT_cl.c:587): 1.54 sec
+[residual_normalized] (ViT_cl.c:598): 0.08 sec
+[MLP] (ViT_cl.c:602): 3.92 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.10 sec
+[multi-head self attention] (ViT_cl.c:587): 1.53 sec
+[residual_normalized] (ViT_cl.c:598): 0.09 sec
+[MLP] (ViT_cl.c:602): 2.75 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.08 sec
+[multi-head self attention] (ViT_cl.c:587): 1.53 sec
+[residual_normalized] (ViT_cl.c:598): 0.08 sec
+[MLP] (ViT_cl.c:602): 2.75 sec
+>> [Encoder] ended
+>> [Encoder] started
+[input_normalized] (ViT_cl.c:583): 0.09 sec
+[multi-head self att

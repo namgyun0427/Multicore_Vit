@@ -33,7 +33,7 @@ static const int size[] = {
     EMBED_DIM * ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE) + 1) // position embedding
 };
 
-static const int enc_size = EMBED_DIM * ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE) + 1);
+static const int ENC_SIZE = EMBED_DIM * ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE) + 1);
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -218,10 +218,6 @@ void ViT_cl (
     Network* networks, 
     float** probabilities
 ) {
-    const int token_size = ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE) + 1);
-
-    UNUSED(token_size);
-
     printf(">> [ViT_cl] : start\n");
 
     init();
@@ -234,12 +230,12 @@ void ViT_cl (
     // encoding layer
     float* enc_layer[12];
     for (int i = 0; i < 12; i++) {
-        enc_layer[i] = (float*)malloc(sizeof(float) * enc_size);
+        enc_layer[i] = (float*)malloc(sizeof(float) * ENC_SIZE);
     }
     
     // encoding output
     float* enc_output;
-    enc_output = (float*)malloc(sizeof(float) * enc_size);
+    enc_output = (float*)malloc(sizeof(float) * ENC_SIZE);
 
 
     // process per image
@@ -456,9 +452,6 @@ void v_Conv2d (
 // input[EMBED_DIM][n_patch_per_image][n_patch_per_image] => output[total_num_patches][EMBED_DIM]
 void v_flatten_transpose (float* input, float* output) {
     int output_size = IMG_SIZE / PATCH_SIZE;
-    int num_patches = output_size * output_size;
-
-    UNUSED(num_patches);
 
     for (int oh = 0; oh < output_size; oh++) {
         for (int ow = 0; ow < output_size; ow++) {
@@ -761,6 +754,7 @@ void v_multihead_attn(
 
 
     // convert attn_output into output space
+    // TODO: convert below using v_layer_norm
     for (int t = 0; t < n_tokens; t++) {
         for (int i = 0; i < EMBED_DIM; i++) {
             float sum = out_bias.data[i];
@@ -842,6 +836,7 @@ void v_mlp_block (
         CHECK_CL_ERROR(err);
     }
 
+    // TODO: 여기도 해버려서 v_mlp_block 그냥 하나로 묶어버리자
     // apply GELU
     for (int i = 0; i < tokens * hidden_dim; i++) {
         fc1_out[i] = v_gelu(fc1_out[i]);

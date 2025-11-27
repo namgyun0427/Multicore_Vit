@@ -1,0 +1,107 @@
+=====================Start========================
+============= processing 0-th iamge =============
+patch_embedded, 573.38
+flatten_transposed, 0.91
+clas_token_prepended, 0.53
+position_embeded, 0.73
+>> [Encoder] started
+input_normalized, 1.27
+multi-head self attention, 1561.28
+1st Residual1, 0.61
+residual_normalized, 1.47
+MLP, 2790.80
+2nd Residual1, 0.69
+>> [Encoder] ended
+>> [Encoder] started
+input_normalized, 1.14
+multi-head self attention, 2887.51
+1st Residual1, 0.82
+residual_normalized, 1.76
+MLP, 3188.11
+2nd Residual1, 0.67
+>> [Encoder] ended
+>> [Encoder] started
+input_normalized, 1.24
+multi-head self attention, 1565.19
+1st Residual1, 0.42
+residual_normalized, 1.06
+MLP, 2762.68
+2nd Residual1, 0.69
+>> [Encoder] ended
+>> [Encoder] started
+input_normalized, 1.25
+multi-head self attention, 1564.56
+1st Residual1, 0.43
+residual_normalized, 1.07
+MLP, 3354.02
+2nd Residual1, 0.97
+>> [Encoder] ended
+>> [Encoder] started
+input_normalized, 1.94
+multi-head self attention, 2710.37
+1st Residual1, 0.42
+residual_normalized, 1.09
+MLP, 2772.66
+2nd Residual1, 0.71
+>> [Encoder] ended
+>> [Encoder] started
+input_normalized, 1.27
+multi-head self attention, 1554.63
+1st Residual1, 0.46
+residual_normalized, 1.06
+MLP, 2816.51
+2nd Residual1, 0.66
+>> [Encoder] ended
+>> [Encoder] started
+input_normalized, 1.92
+multi-head self attention, 1553.27
+1st Residual1, 0.47
+residual_normalized, 1.22
+MLP, 3930.50
+2nd Residual1, 0.94
+>> [Encoder] ended
+>> [Encoder] started
+input_normalized, 1.98
+multi-head self attention, 2007.84
+1st Residual1, 0.42
+residual_normalized, 1.07
+MLP, 2812.66
+2nd Residual1, 0.68
+>> [Encoder] ended
+>> [Encoder] started
+input_normalized, 1.26
+multi-head self attention, 1552.71
+1st Residual1, 0.43
+residual_normalized, 1.07
+MLP, 2819.29
+2nd Residual1, 0.67
+>> [Encoder] ended
+>> [Encoder] started
+input_normalized, 1.26
+multi-head self attention, 1551.99
+1st Residual1, 0.86
+residual_normalized, 1.81
+MLP, 4260.44
+2nd Residual1, 0.66
+>> [Encoder] ended
+>> [Encoder] started
+input_normalized, 1.23
+multi-head self attention, 1552.10
+1st Residual1, 0.42
+residual_normalized, 1.07
+MLP, 2826.36
+2nd Residual1, 0.68
+>> [Encoder] ended
+>> [Encoder] started
+input_normalized, 1.24
+multi-head self attention, 1553.30
+1st Residual1, 0.41
+residual_normalized, 1.06
+MLP, 2787.87
+2nd Residual1, 0.67
+>> [Encoder] ended
+normalize, 1.30
+cls_output, 2.30
+sofemax, 0.01
+Elapsed time: 59.37 sec
+Comparator: 두 파일의 내용이 동일합니다.
