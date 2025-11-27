@@ -15,6 +15,7 @@
 #include <math.h>
 #include <time.h>
 
+#include "log.h"
 #include "constants.h"
 #include "Network.h"
 

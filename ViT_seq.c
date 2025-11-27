@@ -21,19 +21,19 @@ static const int enc_size = EMBED_DIM * ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / P
 // static funtion declaration
 
 
-static void v_Conv2d (
+static void Conv2d (
     float* input, float* output, 
     Network weight, Network bias
 );
 
-static void v_flatten_transpose (float* input, float* output);
+static void flatten_transpose (float* input, float* output);
 
 static void class_token (
     float* patch_tokens, float* final_tokens, 
     Network cls_tk
 );
 
-static void v_pos_emb (
+static void pos_emb (
     float* input, float* output, 
     Network pos_emb
 );
@@ -56,7 +56,7 @@ static void mlp_block (
     Network fc2_weight, Network fc2_bias
 );
 
-static float v_gelu(float x);
+static float gelu(float x);
 
 static void Softmax(float* logits, float* probabilities, int length);
 
@@ -116,21 +116,23 @@ void ViT_seq (
 
 
     for (int i = 0; i < image->n; i++) {
+        printf("============= processing %d-th iamge =============\n", i);
+
         /*patch embedding*/
         float* patch_embedded = layer[0];
-        v_Conv2d(image[i].data, patch_embedded, networks[1], networks[2]);
+        LOG("patch_embedded", Conv2d(image[i].data, patch_embedded, networks[1], networks[2]));
 
         /*flatten and transpose*/
         float* flatten_transposed = layer[1];
-        v_flatten_transpose(patch_embedded, flatten_transposed);
+        LOG("flatten_transposed", flatten_transpose(patch_embedded, flatten_transposed));
 
         /*prepend class token*/
         float* clas_token_prepended = layer[2];
-        class_token(flatten_transposed, clas_token_prepended, networks[0]);
+        LOG("clas_token_prepended", class_token(flatten_transposed, clas_token_prepended, networks[0]));
 
         /*position embedding*/
         float* position_embeded = layer[3];
-        v_pos_emb(clas_token_prepended, position_embeded, networks[3]);
+        LOG("position_embeded", pos_emb(clas_token_prepended, position_embeded, networks[3]));
 
         /*Encoder - 12 Layers*/
         {
@@ -196,7 +198,7 @@ void ViT_seq (
         }
 
         // normalize
-        layer_norm(enc_layer[11], enc_output, networks[148], networks[149]);
+        LOG("normalize", layer_norm(enc_layer[11], enc_output, networks[148], networks[149]));
 
         // load class token
         float* cls_token = (float*)malloc(sizeof(float) * EMBED_DIM);
@@ -204,14 +206,16 @@ void ViT_seq (
         
         // convert class token into output
         float* cls_output = (float*)malloc(sizeof(float) * NUM_CLASSES);
-        linear_layer(
-            cls_token, cls_output, 
-            1, EMBED_DIM, NUM_CLASSES, 
-            networks[150], networks[151]
+        LOG("cls_output", 
+            linear_layer(
+                cls_token, cls_output, 
+                1, EMBED_DIM, NUM_CLASSES, 
+                networks[150], networks[151]
+            );
         );
 
         // sofemax
-        Softmax(cls_output, probabilities[i], NUM_CLASSES);
+        LOG("sofemax", Softmax(cls_output, probabilities[i], NUM_CLASSES));
     }
 }
 
@@ -222,7 +226,7 @@ void ViT_seq (
 
 // image patch embedding (convolution)
 // input[IN_CAHNS][PATCH_SIZE][PATCH_SIZE] => output[EMBED_DIM][n_patch_per_image][n_patch_per_image]
-static void v_Conv2d (
+static void Conv2d (
     float* input, float* output, 
     Network weight, Network bias
 ) {
@@ -271,7 +275,7 @@ static void v_Conv2d (
 /* ------------------------------------------------------------------------------ */
 // transpose + flat
 // input[EMBED_DIM][n_patch_per_image][n_patch_per_image] => output[total_num_patches][EMBED_DIM]
-static void v_flatten_transpose (float* input, float* output) {
+static void flatten_transpose (float* input, float* output) {
     int output_size = IMG_SIZE / PATCH_SIZE;
     int num_patches = output_size * output_size;
 
@@ -325,7 +329,7 @@ static void class_token (
 /* ------------------------------------------------------------------------------ */
 // add position embedding data
 // input[total_num_patches + 1][EMBED_DIM] => output[total_num_patches + 1][EMBED_DIM]
-static void v_pos_emb (
+static void pos_emb (
     float* input, float* output, 
     Network pos_emb
 ) {
@@ -350,37 +354,43 @@ static void Encoder(
     Network ln1_w, Network ln1_b, Network attn_w, Network attn_b, Network attn_out_w, Network attn_out_b,
     Network ln2_w, Network ln2_b, Network mlp1_w, Network mlp1_b, Network mlp2_w, Network mlp2_b
 ) {
+    printf(">> [Encoder] started\n");
+
     int n_tokens = ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE)) + 1;
     size_t buffer_size = sizeof(float) * n_tokens * EMBED_DIM;
     
     // normalize input
     float* input_normalized = (float*)malloc(buffer_size);
-    layer_norm(input, input_normalized, ln1_w, ln1_b);
+    LOG("input_normalized", layer_norm(input, input_normalized, ln1_w, ln1_b));
     
     // multi-head self attention
     float* attn_out = (float*)malloc(buffer_size);
-    multihead_attn(input_normalized, attn_out, attn_w, attn_b, attn_out_w, attn_out_b);
+    LOG("multi-head self attention", multihead_attn(input_normalized, attn_out, attn_w, attn_b, attn_out_w, attn_out_b));
 
     /*Residual1*/
     // skip-connection
     float* residual = (float*)malloc(buffer_size);
-    for (int i = 0; i < n_tokens * EMBED_DIM; i++) {
-        residual[i] = input[i] + attn_out[i];
-    }
+    LOG("1st Residual1", 
+        for (int i = 0; i < n_tokens * EMBED_DIM; i++) {
+            residual[i] = input[i] + attn_out[i];
+        }
+    );
 
     // normalize again
     float* residual_normalized = (float*)malloc(buffer_size);
-    layer_norm(residual, residual_normalized, ln2_w, ln2_b);
+    LOG("residual_normalized", layer_norm(residual, residual_normalized, ln2_w, ln2_b));
 
     /* MLP */
     float* mlp_out = (float*)malloc(buffer_size);
-    mlp_block(residual_normalized, mlp_out, mlp1_w, mlp1_b, mlp2_w, mlp2_b);
+    LOG("MLP", mlp_block(residual_normalized, mlp_out, mlp1_w, mlp1_b, mlp2_w, mlp2_b));
 
     /*Residual2*/
     // skip connection again
-    for (int i = 0; i < n_tokens * EMBED_DIM; i++) {
-        output[i] = residual[i] + mlp_out[i];
-    }
+    LOG("2nd Residual1", 
+        for (int i = 0; i < n_tokens * EMBED_DIM; i++) {
+            output[i] = residual[i] + mlp_out[i];
+        }
+    )
 
     // wrap up
     free(input_normalized);
@@ -388,6 +398,8 @@ static void Encoder(
     free(residual);
     free(residual_normalized);
     free(mlp_out);
+
+    printf(">> [Encoder] ended\n");
 }
 
 
@@ -552,7 +564,7 @@ static void mlp_block (
 
     // apply GELU
     for (int i = 0; i < tokens * hidden_dim; i++) {
-        fc1_out[i] = v_gelu(fc1_out[i]);
+        fc1_out[i] = gelu(fc1_out[i]);
     }
 
     // fc2: (tokens, in_dim)
@@ -567,7 +579,7 @@ static void mlp_block (
 
 
 // GELU function
-static float v_gelu(float x) {
+static float gelu(float x) {
     return 0.5f * x * (1.0f + erff(x / sqrtf(2.0f)));
 }
 

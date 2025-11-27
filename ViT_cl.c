@@ -17,12 +17,10 @@ work_group_size 최대 크기 가져오기?
 확장성 고려하면 이벤트 등등도 인자로 하는게 좋을지도?
 -> 큐 in-order면 차피 무시되니까 그냥 초장부터 이렇게 하는 게 좋을 듯
 
-함수들 그냥 다 노출시키는 게 좋을 것 같은데 접두사 얘기 해보자
-
-환경변수 인자들 IMG_SIZE 같은 상수들은 따로 공통 헤더 만들어서 뺄까?
-
 */
 
+// TODO: normalize 관련 함수 cl_mem 받도록 + 평균,분산,표준편차 gpu에서 계산 + normalize함수 내 흐름 cl_mem으로만 이어지도록
+// TODO: position embedding 함수 matrix_plus쓰는 편으로 변경
 // TODO: n_token은 상수로 뺄까?
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -329,7 +327,7 @@ void ViT_cl (
 
 
         // normalize
-        v_layer_norm(enc_layer[11], enc_output, networks[148], networks[149]);
+        LOG("normalize", v_layer_norm(enc_layer[11], enc_output, networks[148], networks[149]));
 
 
         // load class token
@@ -339,8 +337,7 @@ void ViT_cl (
         // convert class token into output
         float* cls_output = (float*)malloc(sizeof(float) * NUM_CLASSES);
 
-        {
-
+        LOG("cls_output", {
             // create mem obj
 
             // input = [tokens x in_features]
@@ -380,11 +377,20 @@ void ViT_cl (
             // read result
             err = clEnqueueReadBuffer(container.queue, m_output, CL_TRUE, 0, output_size, cls_output, 0, NULL, NULL);
             CHECK_CL_ERROR(err);
-        }
+            
+            err = clReleaseMemObject(m_input);
+            CHECK_CL_ERROR(err);
+            err = clReleaseMemObject(m_weight);
+            CHECK_CL_ERROR(err);
+            err = clReleaseMemObject(m_bias);
+            CHECK_CL_ERROR(err);
+            err = clReleaseMemObject(m_output);
+            CHECK_CL_ERROR(err);
+        });
 
 
         // sofemax
-        v_Softmax(cls_output, probabilities[i], NUM_CLASSES);
+        LOG("sofemax", v_Softmax(cls_output, probabilities[i], NUM_CLASSES));
     }
 
     cleanup();
@@ -464,7 +470,6 @@ void v_flatten_transpose (float* input, float* output) {
                 // output[patch_idx][EMBED_DIM] == output[oh][ow][EMBED_DIM]
                 // input[oc][oh][ow]
                 output[idx_output] = input[idx_input];
-                //printf("%f ",output[idx_output]);
             }
         }
     }
@@ -489,12 +494,6 @@ void v_class_token (
 
     // copy rest of data
     memcpy(final_tokens + EMBED_DIM, patch_tokens, sizeof(float) * EMBED_DIM * num_patches);
-
-    int total_tokens = num_patches + 1; // class token + patch tokens
-    for (int i = 0; i < total_tokens * EMBED_DIM; i++) {
-        //("%f ", final_tokens[i]);
-    }
-    //printf("\n");
 }
 
 
@@ -543,10 +542,7 @@ void v_Encoder(
     /*Residual1*/
     // skip-connection
     float* residual = (float*)malloc(buffer_size);
-    LOG(
-        "1st Residual1", 
-        matrix_plus(input, attn_out, residual, n_tokens * EMBED_DIM);
-    )
+    LOG("1st Residual1", matrix_plus(input, attn_out, residual, n_tokens * EMBED_DIM));
 
 
     // normalize again
@@ -559,8 +555,7 @@ void v_Encoder(
 
     /*Residual2*/
     // skip connection again
-    LOG(
-        "2nd Residual1", 
+    LOG("2nd Residual1", 
         for (int i = 0; i < n_tokens * EMBED_DIM; i++) {
             output[i] = residual[i] + mlp_out[i];
         }
@@ -656,6 +651,28 @@ void v_multihead_attn(
         err = clEnqueueReadBuffer(container.queue, m_k_output, CL_TRUE, 0, output_size, K, 0, NULL, NULL);
         CHECK_CL_ERROR(err);
         err = clEnqueueReadBuffer(container.queue, m_v_output, CL_TRUE, 0, output_size, V, 0, NULL, NULL);
+        CHECK_CL_ERROR(err);
+        
+        // relase mem obj
+        err = clReleaseMemObject(m_input);
+        CHECK_CL_ERROR(err);
+        err = clReleaseMemObject(m_q_weight);
+        CHECK_CL_ERROR(err);
+        err = clReleaseMemObject(m_k_weight);
+        CHECK_CL_ERROR(err);
+        err = clReleaseMemObject(m_v_weight);
+        CHECK_CL_ERROR(err);
+        err = clReleaseMemObject(m_q_bias);
+        CHECK_CL_ERROR(err);
+        err = clReleaseMemObject(m_k_bias);
+        CHECK_CL_ERROR(err);
+        err = clReleaseMemObject(m_v_bias);
+        CHECK_CL_ERROR(err);
+        err = clReleaseMemObject(m_q_output);
+        CHECK_CL_ERROR(err);
+        err = clReleaseMemObject(m_k_output);
+        CHECK_CL_ERROR(err);
+        err = clReleaseMemObject(m_v_output);
         CHECK_CL_ERROR(err);
     }
 
@@ -813,6 +830,16 @@ void v_mlp_block (
         // read result
         err = clEnqueueReadBuffer(container.queue, m_output, CL_TRUE, 0, output_size, fc1_out, 0, NULL, NULL);
         CHECK_CL_ERROR(err);
+        
+        // release mem obj
+        err = clReleaseMemObject(m_input);
+        CHECK_CL_ERROR(err);
+        err = clReleaseMemObject(m_weight);
+        CHECK_CL_ERROR(err);
+        err = clReleaseMemObject(m_bias);
+        CHECK_CL_ERROR(err);
+        err = clReleaseMemObject(m_output);
+        CHECK_CL_ERROR(err);
     }
 
     // apply GELU
@@ -860,6 +887,16 @@ void v_mlp_block (
 
         // read result
         err = clEnqueueReadBuffer(container.queue, m_output, CL_TRUE, 0, output_size, output, 0, NULL, NULL);
+        CHECK_CL_ERROR(err);
+
+        // release mem obj
+        err = clReleaseMemObject(m_input);
+        CHECK_CL_ERROR(err);
+        err = clReleaseMemObject(m_weight);
+        CHECK_CL_ERROR(err);
+        err = clReleaseMemObject(m_bias);
+        CHECK_CL_ERROR(err);
+        err = clReleaseMemObject(m_output);
         CHECK_CL_ERROR(err);
     }
 
