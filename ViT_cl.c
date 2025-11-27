@@ -25,7 +25,6 @@ work_group_size 최대 크기 가져오기?
 
 */
 
-// TODO: matrix_plus 커널 만들기
 // TODO: n_token은 상수로 뺄까?
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -55,20 +54,22 @@ static const int enc_size = EMBED_DIM * ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / P
 // 커널 개수 알맞게 바꾸고, enum 및 필요 정보 추가
 // Kernels_idxs와 kernel_configs의 순서가 맞아야 함
 
-static const size_t N_KERNEL = 4;
+#define N_KERNEL 5
 
 enum Kernels_idxs{
     __reduce_sum = 0,
     __load_square,
     __normalize,
     __matrix_plus,
+    __cl_matrix_plus,
 };
 
-static Kernel_config kernel_configs[] = {
+static Kernel_config kernel_configs[N_KERNEL] = {
     { .kernel_name = "reduce_sum", .file_path = "./kernels/reduce_sum.cl" },
     { .kernel_name = "load_square", .file_path = "./kernels/load_square.cl" },
     { .kernel_name = "my_normalize", .file_path = "./kernels/normalize.cl" },
     { .kernel_name = "matrix_plus", .file_path = "./kernels/matrix_plus.cl" },
+    { .kernel_name = "cl_matrix_plus", .file_path = "./kernels/cl_matrix_plus.cl" },
 };
 
 
@@ -140,6 +141,12 @@ static void linear_layer (
 static void matrix_plus (
     float* input1, float* input2, float* output, 
     size_t n_data
+);
+
+static void cl_matrix_plus (
+    cl_mem m_lvalue, cl_mem m_rvalue, 
+    size_t n_data, 
+    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
 );
 
 
@@ -630,25 +637,15 @@ static void multihead_attn(
     // calculate Q, K, V per token
     for (int t = 0; t < n_tokens; t++) {
         for (int i = 0; i < EMBED_DIM; i++) {
-            // set bias as initial value
-            float sum_q = in_bias.data[Q_dim + i];
-            float sum_k = in_bias.data[K_dim + i];
-            float sum_v = in_bias.data[V_dim + i];
-
-            // do calculation
-            for (int j = 0; j < EMBED_DIM; j++) {
-                // sum_q += input[t][j] * in_weight.data[Q_dim + i][j] 이런 식
-                sum_q += input[t * EMBED_DIM + j] * in_weight.data[(Q_dim + i) * EMBED_DIM + j];
-                sum_k += input[t * EMBED_DIM + j] * in_weight.data[(K_dim + i) * EMBED_DIM + j];
-                sum_v += input[t * EMBED_DIM + j] * in_weight.data[(V_dim + i) * EMBED_DIM + j];
-            }
-
-            // store results
-            Q[t * EMBED_DIM + i] = sum_q;
-            K[t * EMBED_DIM + i] = sum_k;
-            V[t * EMBED_DIM + i] = sum_v;
+            // run kenrl gemm for Q -> e1
+            // e1 -> run kenel matrix_plus for Q -> e2
+            // run kernel K -> e
+            // run kernel V ->e
         }
+        // clWaitForEvents(...);
     }
+    
+    // clWaitForEvents();
 
 
 
@@ -1176,5 +1173,118 @@ static void matrix_plus (
     err = clReleaseMemObject(m_input2);
     CHECK_CL_ERROR(err);
     err = clReleaseMemObject(m_output);
+    CHECK_CL_ERROR(err);
+}
+
+
+
+
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// TODO: CL functions
+
+// cl_mem 을 반환하도록?
+// m_data 바아서 reduce sum 수행하여 m_data[0]에 최종결과 저장
+// static void cl_reduce_sum (
+//     cl_mem m_data, 
+//     cl_mem m_output, 
+//     size_t total_num_data,
+//     size_t work_group_size,
+//     cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
+// ) {
+//     // work_group_size는 2의 거듭제곱수여야 함
+//     assert(((work_group_size & (work_group_size - 1)) == 0));
+    
+//     // create memory object
+//     const size_t buf_size = total_num_data * sizeof(float);
+//     cl_mem m_from = clCreateBuffer(container.context, CL_MEM_READ_WRITE, buf_size, NULL, &err);
+//     cl_mem m_to = clCreateBuffer(container.context, CL_MEM_READ_WRITE, buf_size, NULL, &err);
+
+//     // copy inpupt
+//     err = clEnqueueCopyBuffer(container.queue, m_data, m_from, 0, 0, BUFSIZ, 0, NULL, NULL);
+
+//     size_t n_data = total_num_data;
+//     while (n_data > 1) {
+//         // n_grouup = ceil(n_data / work_group_size)
+//         size_t n_group = (n_data + work_group_size - 1) / work_group_size;
+
+//         // set kernel args
+//         // __kernel void reduce_sum (
+//         //     __global float* const g_input,
+//         //     __global float* const g_output,
+//         //     int n_data,
+//         //     __local float* l_sum
+//         // ) {
+//         KernelArg args[] = {
+//             { .size = sizeof(cl_mem), .addr = &m_from},
+//             { .size = sizeof(cl_mem), .addr = &m_to},
+//             { .size = sizeof(int), .addr = &n_data},
+//             { .size = sizeof(float) * work_group_size, .addr = NULL}
+//         };
+
+//         for (int i=0; i<4; ++i) {
+//             err = clSetKernelArg(container.kernels[__reduce_sum], i, args[i].size, args[i].addr);
+//             CHECK_CL_ERROR(err);
+//         }
+
+//         // run kernel
+//         const size_t global_work_size = n_group * work_group_size;
+//         const size_t local_work_size = work_group_size;
+//         err = clEnqueueNDRangeKernel(
+//             container.queue, container.kernels[__reduce_sum], 
+//             1, NULL, &global_work_size, &local_work_size, 
+//             0, NULL, NULL);
+//         CHECK_CL_ERROR(err);
+
+//         // swap input and output buffers
+//         cl_mem tmp = m_from;
+//         m_from = m_to;
+//         m_to = tmp;
+
+//         // set next value
+//         n_data = n_group;
+//     }
+
+//     // write result to m_output
+//     // m_from[0]에 최종결과가 남음
+//     err = clEnqueueCopyBuffer(container.queue, m_from, m_output, 0, 0, sizeof(float), 0, NULL, NULL);
+
+//     // release mem obj
+// }
+
+
+
+// 행렬덧셈: m_lvalue += m_rvalue
+static void cl_matrix_plus (
+    cl_mem m_lvalue, cl_mem m_rvalue, 
+    size_t n_data,
+    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
+) {
+    cl_kernel target_kernel = container.kernels[__cl_matrix_plus];
+
+    // set kernel args
+    // __kernel void cl_matrix_plus (
+    //     __global float* g_lvalue,
+    //     __global float* g_rvalue
+    // ) {
+    KernelArg args[] = {
+        { .size = sizeof(cl_mem), .addr = &m_lvalue },
+        { .size = sizeof(cl_mem), .addr = &m_rvalue },
+    };
+
+    for (int i=0; i<2; ++i) {
+        err = clSetKernelArg(target_kernel, i, args[i].size, args[i].addr);
+        CHECK_CL_ERROR(err);
+    }
+
+    // run kernel
+    size_t gloabl_work_size[] = { n_data };
+    err = clEnqueueNDRangeKernel(
+        container.queue, target_kernel, 
+        1, NULL, gloabl_work_size, NULL, 
+        e_num_waiting, e_waiting_arr, e_out
+    );
     CHECK_CL_ERROR(err);
 }
