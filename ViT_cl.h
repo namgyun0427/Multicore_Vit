@@ -168,4 +168,37 @@ void v_linear_layer (
     cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
 );
 
+void v_reduce_sum_of_square (
+    cl_mem m_data, 
+    cl_mem m_output, 
+    size_t total_num_data,
+    size_t work_group_size,
+    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
+);
+
+void v_reduce_sum (
+    cl_mem m_data, 
+    cl_mem m_output, 
+    size_t total_num_data,
+    size_t work_group_size,
+    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
+);
+
+void v_cal_mean_and_inv_std (
+    cl_mem m_sum, cl_mem m_sum_of_square,
+    cl_mem m_mean, cl_mem m_inv_std,
+    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
+);
+
+void v_normalize (
+    cl_mem m_input, 
+    cl_mem m_weight, cl_mem m_bias,
+    cl_mem m_mean, cl_mem m_inv_std,
+    int total_num_data,
+    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
+);
+
+
+
+
 #endif // _ViT_cl_H

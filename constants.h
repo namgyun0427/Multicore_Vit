@@ -14,7 +14,7 @@
 
 
     // comment this to process one img
-    // #define SWITCH_100
+    #define SWITCH_100
 
     #ifdef SWITCH_100
         #define IMAGE_COUNT 100
