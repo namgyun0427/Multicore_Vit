@@ -20,7 +20,6 @@ work_group_size 최대 크기 가져오기?
 */
 
 // TODO: matrix_plus 함수 cl_mem 받도록
-// TODO: normalize 관련 함수 cl_mem 받도록 + 평균,분산,표준편차 gpu에서 계산 + normalize함수 내 흐름 cl_mem으로만 이어지도록
 // TODO: position embedding 함수 matrix_plus쓰는 편으로 변경
 // TODO: n_token은 상수로 뺄까? -> 뺐고 대채하기
 
@@ -758,7 +757,7 @@ void v_multihead_attn(
 
 
     // convert attn_output into output space
-    // TODO: convert below using v_layer_norm
+    // TODO: convert below using v_lyneaer_
     for (int t = 0; t < n_tokens; t++) {
         for (int i = 0; i < EMBED_DIM; i++) {
             float sum = out_bias.data[i];
@@ -943,7 +942,7 @@ void v_layer_norm (
     float* input, float* output, 
     Network weight, Network bias
 ) {
-    const int token = ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE)) + 1;
+    const int token = N_TOTAL_TOKEN;
     const int total_num_data = token * EMBED_DIM;
 
     memcpy(output, input, total_num_data * sizeof(float));
@@ -964,7 +963,7 @@ void v_layer_norm (
 
         size_t bias_size = bias.size * sizeof(float);
         cl_mem m_bias = clCreateBuffer(container.context, CL_MEM_READ_WRITE, bias_size, NULL, &err);
-        err = clEnqueueWriteBuffer(container.queue, m_weight, CL_TRUE, 0, bias_size, bias.data, 0, NULL, NULL);
+        err = clEnqueueWriteBuffer(container.queue, m_bias, CL_TRUE, 0, bias_size, bias.data, 0, NULL, NULL);
 
         size_t just_float1_size = sizeof(float);
         cl_mem m_sum = clCreateBuffer(container.context, CL_MEM_READ_WRITE, just_float1_size, NULL, &err);
@@ -975,14 +974,10 @@ void v_layer_norm (
 
 
         // run kernels
-        LOG("v_reduce_sum", v_reduce_sum(m_data, m_sum, n_data, work_group_size, 0, NULL, NULL));
-        LOG("v_reduce_sum_of_square", v_reduce_sum_of_square(m_data, m_sum_of_square, n_data, work_group_size, 0, NULL, NULL));
-        LOG("v_cal_mean_and_inv_std", v_cal_mean_and_inv_std(m_sum, m_sum_of_square, m_mean, m_inv_std, 0, NULL, NULL));
-        // LOG("v_normalize", v_normalize(m_data, m_weight, m_bias, m_mean, m_inv_std, total_num_data, 0, NULL, NULL));
-
-        
-        err = clEnqueueReadBuffer(container.queue, m_data, CL_TRUE, 0, data_size, p_data, 0, NULL, NULL);
-
+        v_reduce_sum(m_data, m_sum, n_data, work_group_size, 0, NULL, NULL);
+        v_reduce_sum_of_square(m_data, m_sum_of_square, n_data, work_group_size, 0, NULL, NULL);
+        v_cal_mean_and_inv_std(m_sum, m_sum_of_square, m_mean, m_inv_std, 0, NULL, NULL);
+        v_normalize(m_data, m_weight, m_bias, m_mean, m_inv_std, total_num_data, 0, NULL, NULL);
 
 
 
@@ -1583,9 +1578,9 @@ void v_reduce_sum_of_square (
         //     g_input[global_id] = g_input[global_id] * g_input[global_id];
         // }
         KernelArg args[] = {
-             { .size = sizeof(cl_mem), .addr = &m_tmp},
+            { .size = sizeof(cl_mem), .addr = &m_tmp},
         };
-    
+
         for (int i=0; i<1; ++i) {
             err = clSetKernelArg(container.kernels[__load_square], i, args[i].size, args[i].addr);
             CHECK_CL_ERROR(err);
