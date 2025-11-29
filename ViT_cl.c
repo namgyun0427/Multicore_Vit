@@ -1038,75 +1038,137 @@ void v_cal_mean_and_inv_std (
     CHECK_CL_ERROR(err);
 }
 
-void normalize (
-    float* input, 
-    Network weight, 
-    Network bias, 
-    int total_num_data,
-    const float mean,
-    const float inv_std
+void v_reduce_sum (
+    cl_mem m_data, 
+    cl_mem m_output, 
+    size_t total_num_data,
+    size_t work_group_size,
+    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
 ) {
-    // create memory objects
-    size_t input_size = total_num_data * sizeof(float);
-    cl_mem m_input = clCreateBuffer(container.context, CL_MEM_READ_WRITE, input_size, NULL, &err);
+    // work_group_size는 2의 거듭제곱수여야 함
+    assert(((work_group_size & (work_group_size - 1)) == 0));
+    
+    // create memory object
+    const size_t buf_size = total_num_data * sizeof(float);
+    cl_mem m_from = clCreateBuffer(container.context, CL_MEM_READ_WRITE, buf_size, NULL, &err);
     CHECK_CL_ERROR(err);
-    cl_mem m_weight = clCreateBuffer(container.context, CL_MEM_READ_ONLY, input_size, NULL, &err);
+    cl_mem m_to = clCreateBuffer(container.context, CL_MEM_READ_WRITE, buf_size, NULL, &err);
     CHECK_CL_ERROR(err);
-    cl_mem m_bias = clCreateBuffer(container.context, CL_MEM_READ_ONLY, input_size, NULL, &err);
-    CHECK_CL_ERROR(err);
-
-    // write
-    err = clEnqueueWriteBuffer(container.queue, m_input, CL_TRUE, 0, input_size, input, 0, NULL, NULL);
-    CHECK_CL_ERROR(err);
-    err = clEnqueueWriteBuffer(container.queue, m_weight, CL_TRUE, 0, input_size, weight.data, 0, NULL, NULL);
-    CHECK_CL_ERROR(err);
-    err = clEnqueueWriteBuffer(container.queue, m_bias, CL_TRUE, 0, input_size, bias.data, 0, NULL, NULL);
+    
+    // copy inpupt
+    err = clEnqueueCopyBuffer(container.queue, m_data, m_from, 0, 0, buf_size, e_num_waiting, e_waiting_arr, NULL);
     CHECK_CL_ERROR(err);
 
+    size_t n_data = total_num_data;
+    while (n_data > 1) {
+        // n_grouup = ceil(n_data / work_group_size)
+        size_t n_group = (n_data + work_group_size - 1) / work_group_size;
 
-    // set kernel args
-    // __kernel void normalize(
-    //     __global float* g_input,
-    //     __global const float* g_weight,
-    //     __global const float* g_bias,
-    //     const float MEAN,
-    //     const float INV_STD
-    // ) {
-    KernelArg args[] = {
-        { .size = sizeof(cl_mem), .addr = &m_input},
-        { .size = sizeof(cl_mem), .addr = &m_weight},
-        { .size = sizeof(cl_mem), .addr = &m_bias},
-        { .size = sizeof(float), .addr = &mean},
-        { .size = sizeof(float), .addr = &inv_std}
-    };
+        // set kernel args
+        // __kernel void reduce_sum (
+        //     __global float* const g_input,
+        //     __global float* const g_output,
+        //     int n_data,
+        //     __local float* l_sum
+        // ) {
+        KernelArg args[] = {
+            { .size = sizeof(cl_mem), .addr = &m_from},
+            { .size = sizeof(cl_mem), .addr = &m_to},
+            { .size = sizeof(int), .addr = &n_data},
+            { .size = sizeof(float) * work_group_size, .addr = NULL}
+        };
 
-    for (int i=0; i<5; ++i) {
-        err = clSetKernelArg(container.kernels[__normalize], i, args[i].size, args[i].addr);
+        for (int i=0; i<4; ++i) {
+            err = clSetKernelArg(container.kernels[__reduce_sum], i, args[i].size, args[i].addr);
+            CHECK_CL_ERROR(err);
+        }
+
+        // run kernel
+        const size_t global_work_size = n_group * work_group_size;
+        const size_t local_work_size = work_group_size;
+        err = clEnqueueNDRangeKernel(
+            container.queue, container.kernels[__reduce_sum], 
+            1, NULL, &global_work_size, &local_work_size, 
+            0, NULL, NULL);
         CHECK_CL_ERROR(err);
+
+        // swap input and output buffers
+        cl_mem tmp = m_from;
+        m_from = m_to;
+        m_to = tmp;
+
+        // set next value
+        n_data = n_group;
     }
 
+    // write result to m_output
+    // m_from[0]에 최종결과가 남음
+    err = clEnqueueCopyBuffer(container.queue, m_from, m_output, 0, 0, sizeof(float), 0, NULL, e_out);
 
-    // run kernel
-    const size_t global_work_size = total_num_data;
-    err = clEnqueueNDRangeKernel(
-        container.queue, container.kernels[__normalize], 
-        1, NULL, &global_work_size, NULL, 
-        0, NULL, NULL);
+    // release mem obj
+    err = clReleaseMemObject(m_from);
     CHECK_CL_ERROR(err);
-
-    // read result
-    err = clEnqueueReadBuffer(container.queue, m_input, CL_TRUE, 0, input_size, input, 0, NULL, NULL);
-    CHECK_CL_ERROR(err);
-
-    // release memory objects
-    err = clReleaseMemObject(m_input);
-    CHECK_CL_ERROR(err);
-    err = clReleaseMemObject(m_weight);
-    CHECK_CL_ERROR(err);
-    err = clReleaseMemObject(m_bias);
+    err = clReleaseMemObject(m_to);
     CHECK_CL_ERROR(err);
 }
 
+
+void v_reduce_sum_of_square (
+    cl_mem m_data, 
+    cl_mem m_output, 
+    size_t total_num_data,
+    size_t work_group_size,
+    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
+) {
+    // work_group_size는 2의 거듭제곱수여야 함
+    assert(((work_group_size & (work_group_size - 1)) == 0));
+
+    // 흐음 얘 어떻게 해야하지...?
+    UNUSED(e_out);
+
+    // create memory objects
+    size_t data_size = total_num_data * sizeof(float);
+    cl_mem m_tmp = clCreateBuffer(container.context, CL_MEM_READ_WRITE, data_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+    
+    // copy data to m_tmp
+    err = clEnqueueCopyBuffer(container.queue, m_data, m_tmp, 0, 0, data_size, e_num_waiting, e_waiting_arr, NULL);
+    CHECK_CL_ERROR(err);
+
+    // square m_tmp matrix
+    {
+        // set args
+        // __kernel void load_square (
+        //     __global float* g_input
+        // ) {
+        //     size_t global_id = get_global_id(0);
+        //     g_input[global_id] = g_input[global_id] * g_input[global_id];
+        // }
+        KernelArg args[] = {
+            { .size = sizeof(cl_mem), .addr = &m_tmp},
+        };
+
+        for (int i=0; i<1; ++i) {
+            err = clSetKernelArg(container.kernels[__load_square], i, args[i].size, args[i].addr);
+            CHECK_CL_ERROR(err);
+        }
+
+        // run kernel
+        const size_t global_work_size = total_num_data;
+        err = clEnqueueNDRangeKernel(
+            container.queue, container.kernels[__load_square], 
+            1, NULL, &global_work_size, NULL, 
+            0, NULL, NULL);
+        CHECK_CL_ERROR(err);
+    }
+
+    // process reduce sum with squared data matrix
+    v_reduce_sum(m_tmp, m_output, total_num_data, work_group_size, 0, NULL, NULL);
+
+    // release memory objects
+    err = clReleaseMemObject(m_tmp);
+    CHECK_CL_ERROR(err);
+}
 
 
 void v_normalize (
@@ -1145,187 +1207,11 @@ void v_normalize (
     CHECK_CL_ERROR(err);
 }
 
-float reduce_sum (
-    float* input, 
-    int total_num_data,
-    size_t work_group_size
-) {
-    // work_group_size는 2의 거듭제곱수여야 함
-    assert(((work_group_size & (work_group_size - 1)) == 0));
-
-    // create memory objects
-    size_t input_size = total_num_data * sizeof(float);
-    cl_mem m_input = clCreateBuffer(container.context, CL_MEM_READ_WRITE, input_size, NULL, &err);
-    cl_mem m_output = clCreateBuffer(container.context, CL_MEM_READ_WRITE, input_size, NULL, &err);
-    
-    // write
-    err = clEnqueueWriteBuffer(container.queue, m_input, CL_TRUE, 0, input_size, input, 0, NULL, NULL);
-    CHECK_CL_ERROR(err);
-
-    int n_data = total_num_data;
-    while (n_data > 1) {
-        // n_grouup = ceil(n_data / work_group_size)
-        int n_group = (n_data + work_group_size - 1) / work_group_size;
-
-        // set kernel args
-        // __kernel void reduce_sum (
-        //     __global float* const g_input,
-        //     __global float* const g_output,
-        //     int n_data,
-        //     __local float* l_sum
-        // ) {
-        KernelArg args[] = {
-            { .size = sizeof(cl_mem), .addr = &m_input},
-            { .size = sizeof(cl_mem), .addr = &m_output},
-            { .size = sizeof(int), .addr = &n_data},
-            { .size = sizeof(float) * work_group_size, .addr = NULL}
-        };
-
-        for (int i=0; i<4; ++i) {
-            err = clSetKernelArg(container.kernels[__reduce_sum], i, args[i].size, args[i].addr);
-            CHECK_CL_ERROR(err);
-        }
-
-        // run kernel
-        const size_t global_work_size = n_group * work_group_size;
-        const size_t local_work_size = work_group_size;
-        err = clEnqueueNDRangeKernel(
-            container.queue, container.kernels[__reduce_sum], 
-            1, NULL, &global_work_size, &local_work_size, 
-            0, NULL, NULL);
-        CHECK_CL_ERROR(err);
-
-        // swap input and output buffers
-        cl_mem tmp = m_input;
-        m_input = m_output;
-        m_output = tmp;
-
-        // set next value
-        n_data = n_group;
-    }
-
-
-    // read 
-    float result;
-    err = clEnqueueReadBuffer(container.queue, m_input, CL_TRUE, 0, sizeof(float), &result, 0, NULL, NULL);
-    CHECK_CL_ERROR(err);
-
-    // release memory objects
-    err = clReleaseMemObject(m_input);
-    CHECK_CL_ERROR(err);
-    err = clReleaseMemObject(m_output);
-    CHECK_CL_ERROR(err);
-
-    // return result
-    return result;
-}
-
-
-float reduce_sum_of_square (
-    float* input, 
-    int total_num_data,
-    size_t work_group_size
-) {
-    // work_group_size는 2의 거듭제곱수여야 함
-    assert(((work_group_size & (work_group_size - 1)) == 0));
-
-    // create memory objects
-    size_t input_size = total_num_data * sizeof(float);
-    cl_mem m_input = clCreateBuffer(container.context, CL_MEM_READ_WRITE, input_size, NULL, &err);
-    cl_mem m_output = clCreateBuffer(container.context, CL_MEM_READ_WRITE, input_size, NULL, &err);
-    
-    // write
-    err = clEnqueueWriteBuffer(container.queue, m_input, CL_TRUE, 0, input_size, input, 0, NULL, NULL);
-    CHECK_CL_ERROR(err);
-
-
-    // load square
-    {
-        // set args
-        // __kernel void load_square (
-        //     __global float* g_input
-        // ) {
-        //     size_t global_id = get_global_id(0);
-        //     g_input[global_id] = g_input[global_id] * g_input[global_id];
-        // }
-        KernelArg args[] = {
-             { .size = sizeof(cl_mem), .addr = &m_input},
-        };
-    
-        for (int i=0; i<1; ++i) {
-            err = clSetKernelArg(container.kernels[__load_square], i, args[i].size, args[i].addr);
-            CHECK_CL_ERROR(err);
-        }
-
-        // run kernel
-        const size_t global_work_size = total_num_data;
-        err = clEnqueueNDRangeKernel(
-            container.queue, container.kernels[__load_square], 
-            1, NULL, &global_work_size, NULL, 
-            0, NULL, NULL);
-        CHECK_CL_ERROR(err);
-    }
 
 
 
-    // reduce sum
-    int n_data = total_num_data;
-    while (n_data > 1) {
-        // n_grouup = ceil(n_data / work_group_size)
-        int n_group = (n_data + work_group_size - 1) / work_group_size;
 
-        // set kernel args
-        // __kernel void reduce_sum (
-        //     __global float* const g_input,
-        //     __global float* const g_output,
-        //     int n_data,
-        //     __local float* l_sum
-        // ) {
-        KernelArg args[] = {
-            { .size = sizeof(cl_mem), .addr = &m_input},
-            { .size = sizeof(cl_mem), .addr = &m_output},
-            { .size = sizeof(int), .addr = &n_data},
-            { .size = sizeof(float) * work_group_size, .addr = NULL}
-        };
-
-        for (int i=0; i<4; ++i) {
-            err = clSetKernelArg(container.kernels[__reduce_sum], i, args[i].size, args[i].addr);
-            CHECK_CL_ERROR(err);
-        }
-
-        // run kernel
-        const size_t global_work_size = n_group * work_group_size;
-        const size_t local_work_size = work_group_size;
-        err = clEnqueueNDRangeKernel(
-            container.queue, container.kernels[__reduce_sum], 
-            1, NULL, &global_work_size, &local_work_size, 
-            0, NULL, NULL);
-        CHECK_CL_ERROR(err);
-
-        // swap input and output buffers
-        cl_mem tmp = m_input;
-        m_input = m_output;
-        m_output = tmp;
-
-        // set next value
-        n_data = n_group;
-    }
-
-
-    // read 
-    float result;
-    err = clEnqueueReadBuffer(container.queue, m_input, CL_TRUE, 0, sizeof(float), &result, 0, NULL, NULL);
-    CHECK_CL_ERROR(err);
-
-    // release memory objects
-    err = clReleaseMemObject(m_input);
-    CHECK_CL_ERROR(err);
-    err = clReleaseMemObject(m_output);
-    CHECK_CL_ERROR(err);
-
-    // return result
-    return result;
-}
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // do linear transform with input matrix(network)
 void v_linear_layer (
@@ -1436,81 +1322,6 @@ void matrix_plus (
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-void v_reduce_sum (
-    cl_mem m_data, 
-    cl_mem m_output, 
-    size_t total_num_data,
-    size_t work_group_size,
-    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
-) {
-    // work_group_size는 2의 거듭제곱수여야 함
-    assert(((work_group_size & (work_group_size - 1)) == 0));
-    
-    // create memory object
-    const size_t buf_size = total_num_data * sizeof(float);
-    cl_mem m_from = clCreateBuffer(container.context, CL_MEM_READ_WRITE, buf_size, NULL, &err);
-    CHECK_CL_ERROR(err);
-    cl_mem m_to = clCreateBuffer(container.context, CL_MEM_READ_WRITE, buf_size, NULL, &err);
-    CHECK_CL_ERROR(err);
-    
-    // copy inpupt
-    err = clEnqueueCopyBuffer(container.queue, m_data, m_from, 0, 0, buf_size, e_num_waiting, e_waiting_arr, NULL);
-    CHECK_CL_ERROR(err);
-
-    size_t n_data = total_num_data;
-    while (n_data > 1) {
-        // n_grouup = ceil(n_data / work_group_size)
-        size_t n_group = (n_data + work_group_size - 1) / work_group_size;
-
-        // set kernel args
-        // __kernel void reduce_sum (
-        //     __global float* const g_input,
-        //     __global float* const g_output,
-        //     int n_data,
-        //     __local float* l_sum
-        // ) {
-        KernelArg args[] = {
-            { .size = sizeof(cl_mem), .addr = &m_from},
-            { .size = sizeof(cl_mem), .addr = &m_to},
-            { .size = sizeof(int), .addr = &n_data},
-            { .size = sizeof(float) * work_group_size, .addr = NULL}
-        };
-
-        for (int i=0; i<4; ++i) {
-            err = clSetKernelArg(container.kernels[__reduce_sum], i, args[i].size, args[i].addr);
-            CHECK_CL_ERROR(err);
-        }
-
-        // run kernel
-        const size_t global_work_size = n_group * work_group_size;
-        const size_t local_work_size = work_group_size;
-        err = clEnqueueNDRangeKernel(
-            container.queue, container.kernels[__reduce_sum], 
-            1, NULL, &global_work_size, &local_work_size, 
-            0, NULL, NULL);
-        CHECK_CL_ERROR(err);
-
-        // swap input and output buffers
-        cl_mem tmp = m_from;
-        m_from = m_to;
-        m_to = tmp;
-
-        // set next value
-        n_data = n_group;
-    }
-
-    // write result to m_output
-    // m_from[0]에 최종결과가 남음
-    err = clEnqueueCopyBuffer(container.queue, m_from, m_output, 0, 0, sizeof(float), 0, NULL, e_out);
-
-    // release mem obj
-    err = clReleaseMemObject(m_from);
-    CHECK_CL_ERROR(err);
-    err = clReleaseMemObject(m_to);
-    CHECK_CL_ERROR(err);
-}
-
-
 
 // 행렬덧셈: m_lvalue += m_rvalue
 // void cl_matrix_plus (
@@ -1546,59 +1357,3 @@ void v_reduce_sum (
 // }
 
 
-void v_reduce_sum_of_square (
-    cl_mem m_data, 
-    cl_mem m_output, 
-    size_t total_num_data,
-    size_t work_group_size,
-    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
-) {
-    // work_group_size는 2의 거듭제곱수여야 함
-    assert(((work_group_size & (work_group_size - 1)) == 0));
-
-    // 흐음 얘 어떻게 해야하지...?
-    UNUSED(e_out);
-
-    // create memory objects
-    size_t data_size = total_num_data * sizeof(float);
-    cl_mem m_tmp = clCreateBuffer(container.context, CL_MEM_READ_WRITE, data_size, NULL, &err);
-    CHECK_CL_ERROR(err);
-    
-    // copy data to m_tmp
-    err = clEnqueueCopyBuffer(container.queue, m_data, m_tmp, 0, 0, data_size, e_num_waiting, e_waiting_arr, NULL);
-    CHECK_CL_ERROR(err);
-
-    // square m_tmp matrix
-    {
-        // set args
-        // __kernel void load_square (
-        //     __global float* g_input
-        // ) {
-        //     size_t global_id = get_global_id(0);
-        //     g_input[global_id] = g_input[global_id] * g_input[global_id];
-        // }
-        KernelArg args[] = {
-            { .size = sizeof(cl_mem), .addr = &m_tmp},
-        };
-
-        for (int i=0; i<1; ++i) {
-            err = clSetKernelArg(container.kernels[__load_square], i, args[i].size, args[i].addr);
-            CHECK_CL_ERROR(err);
-        }
-
-        // run kernel
-        const size_t global_work_size = total_num_data;
-        err = clEnqueueNDRangeKernel(
-            container.queue, container.kernels[__load_square], 
-            1, NULL, &global_work_size, NULL, 
-            0, NULL, NULL);
-        CHECK_CL_ERROR(err);
-    }
-
-    // process reduce sum with squared data matrix
-    v_reduce_sum(m_tmp, m_output, total_num_data, work_group_size, 0, NULL, NULL);
-
-    // release memory objects
-    err = clReleaseMemObject(m_tmp);
-    CHECK_CL_ERROR(err);
-}
