@@ -6,11 +6,16 @@
     #define PATCH_SIZE 16
     #define IN_CAHNS 3
     #define NUM_CLASSES 1000
+
     #define EMBED_DIM 768
+    #define HIDDEN_DIM 3072
+    #define N_TOTAL_TOKEN 197
+
     #define NUM_HEADS 12
+    #define HEAD_DIM 64
+    
     #define MLP_RATIO 4.0
     #define EPSILON 1e-6
-    #define N_TOTAL_TOKEN ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE) + 1)
 
 
     // comment this to process one img

@@ -26,8 +26,7 @@ OUT_BIN = $(OUT_DIR_BUILD)/main
 
 
 IN_TEST = \
-	$(IN_DIR_TEST)/reduce_sum.c \
-	$(IN_DIR_TEST)/reduce_sum_of_square.c
+	$(IN_DIR_TEST)/v_reduce_sum.c
 	
 OUT_TEST = $(patsubst $(IN_DIR_TEST)/%.c, $(OUT_DIR_TEST)/%, $(IN_TEST))
 

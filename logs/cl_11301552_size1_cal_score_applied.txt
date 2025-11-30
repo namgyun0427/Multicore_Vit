@@ -1,0 +1,113 @@
+=====================Start========================
+>> [ViT_cl] : start
+>> [init] : start
+>> [init] : ended
+============= processing 0-th iamge =============
+patch_embedded, 588.48
+flatten_transposed, 0.92
+clas_token_prepended, 0.29
+position_embeded, 0.75
+>> [v_Encoder] started
+input_normalized, 56.07
+multi-head self attention, 500.33
+1st Residual1, 1.14
+residual_normalized, 56.27
+MLP, 91.28
+2nd Residual1, 0.64
+>> [v_Encoder] ended
+>> [v_Encoder] started
+input_normalized, 55.61
+multi-head self attention, 500.54
+1st Residual1, 0.86
+residual_normalized, 53.66
+MLP, 56.53
+2nd Residual1, 0.66
+>> [v_Encoder] ended
+>> [v_Encoder] started
+input_normalized, 53.69
+multi-head self attention, 467.34
+1st Residual1, 0.86
+residual_normalized, 50.96
+MLP, 41.06
+2nd Residual1, 0.62
+>> [v_Encoder] ended
+>> [v_Encoder] started
+input_normalized, 51.54
+multi-head self attention, 479.60
+1st Residual1, 0.83
+residual_normalized, 52.22
+MLP, 40.92
+2nd Residual1, 0.73
+>> [v_Encoder] ended
+>> [v_Encoder] started
+input_normalized, 52.71
+multi-head self attention, 469.21
+1st Residual1, 0.81
+residual_normalized, 59.65
+MLP, 41.40
+2nd Residual1, 0.63
+>> [v_Encoder] ended
+>> [v_Encoder] started
+input_normalized, 53.68
+multi-head self attention, 471.73
+1st Residual1, 0.84
+residual_normalized, 54.85
+MLP, 57.71
+2nd Residual1, 0.63
+>> [v_Encoder] ended
+>> [v_Encoder] started
+input_normalized, 53.60
+multi-head self attention, 490.17
+1st Residual1, 0.86
+residual_normalized, 54.67
+MLP, 55.69
+2nd Residual1, 0.64
+>> [v_Encoder] ended
+>> [v_Encoder] started
+input_normalized, 54.22
+multi-head self attention, 474.43
+1st Residual1, 0.85
+residual_normalized, 53.00
+MLP, 40.45
+2nd Residual1, 0.68
+>> [v_Encoder] ended
+>> [v_Encoder] started
+input_normalized, 51.73
+multi-head self attention, 477.74
+1st Residual1, 0.84
+residual_normalized, 50.08
+MLP, 36.95
+2nd Residual1, 0.63
+>> [v_Encoder] ended
+>> [v_Encoder] started
+input_normalized, 54.74
+multi-head self attention, 873.75
+1st Residual1, 0.97
+residual_normalized, 71.06
+MLP, 37.18
+2nd Residual1, 1.02
+>> [v_Encoder] ended
+>> [v_Encoder] started
+input_normalized, 69.62
+multi-head self attention, 877.20
+1st Residual1, 0.94
+residual_normalized, 73.37
+MLP, 66.91
+2nd Residual1, 0.97
+>> [v_Encoder] ended
+>> [v_Encoder] started
+input_normalized, 73.02
+multi-head self attention, 866.33
+1st Residual1, 0.96
+residual_normalized, 81.15
+MLP, 43.26
+2nd Residual1, 0.91
+>> [v_Encoder] ended
+normalize, 76.60
+cls_output, 1.36
+sofemax, 0.02
+>> [cleanup] : start
+>> [cleanup] : ended
+>> [ViT_cl] : ended
+Elapsed time: 9.87 sec
+Comparator: 두 파일의 내용이 동일합니다.

@@ -121,7 +121,7 @@ void v_mlp_block (
     Network fc2_weight, Network fc2_bias
 );
 
-float v_gelu(float x);
+void v_gelu (cl_mem m_data, size_t n_data);
 
 void v_Softmax(float* logits, float* probabilities, int length);
 
