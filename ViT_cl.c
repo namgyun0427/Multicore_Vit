@@ -42,9 +42,9 @@ static const int ENC_SIZE = EMBED_DIM * ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / P
 // Kernels_idxs와 kernel_configs의 순서가 맞아야 함
 // kernel_configs 를 순회해서 각 file_path 별로 소스 코드를 뽑아서 빌드함
 
-#define N_KERNEL 8
+#define N_KERNEL 9
 
-enum Kernels_idxs{
+enum Kernels_idxs {
     __reduce_sum = 0,
     __load_square,
     __normalize,
@@ -53,17 +53,19 @@ enum Kernels_idxs{
     __linear,
     __cal_mean_and_inv_std,
     __gelu,
+    __softmax,
 };
 
 static Kernel_config kernel_configs[N_KERNEL] = {
-    { .kernel_name = "reduce_sum", .file_path = "./kernels/reduce_sum.cl" },
-    { .kernel_name = "load_square", .file_path = "./kernels/load_square.cl" },
-    { .kernel_name = "my_normalize", .file_path = "./kernels/normalize.cl" },
-    { .kernel_name = "matrix_plus", .file_path = "./kernels/matrix_plus.cl" },
-    { .kernel_name = "cl_matrix_plus", .file_path = "./kernels/cl_matrix_plus.cl" },
-    { .kernel_name = "linear", .file_path = "./kernels/linear.cl" },
-    { .kernel_name = "cal_mean_and_inv_std", .file_path = "./kernels/cal_mean_and_inv_std.cl" },
-    { .kernel_name = "gelu", .file_path = "./kernels/gelu.cl" },
+    {.kernel_name = "reduce_sum", .file_path = "./kernels/reduce_sum.cl" },
+    {.kernel_name = "load_square", .file_path = "./kernels/load_square.cl" },
+    {.kernel_name = "my_normalize", .file_path = "./kernels/normalize.cl" },
+    {.kernel_name = "matrix_plus", .file_path = "./kernels/matrix_plus.cl" },
+    {.kernel_name = "cl_matrix_plus", .file_path = "./kernels/cl_matrix_plus.cl" },
+    {.kernel_name = "linear", .file_path = "./kernels/linear.cl" },
+    {.kernel_name = "cal_mean_and_inv_std", .file_path = "./kernels/cal_mean_and_inv_std.cl" },
+    {.kernel_name = "gelu", .file_path = "./kernels/gelu.cl" },
+    {.kernel_name = "softmax_kernel", .file_path = "./kernels/softmax.cl" },
 };
 
 
@@ -146,28 +148,28 @@ void init() {
     container.kernels = (cl_kernel*)calloc(container.n_kernels, sizeof(cl_kernel));
     container.src_arr = (char**)calloc(container.n_kernels, sizeof(char*));
     container.len_arr = (size_t*)calloc(container.n_kernels, sizeof(size_t));
-    
+
     // get sources
-    for (size_t i=0; i<container.n_kernels; ++i) {
+    for (size_t i = 0; i < container.n_kernels; ++i) {
         container.src_arr[i] = v_get_source_code(container.kernel_configs[i].file_path, &container.len_arr[i]);
     }
 
     // create program
     container.program = clCreateProgramWithSource(container.context, container.n_kernels, (const char**)container.src_arr, container.len_arr, &err);
     CHECK_CL_ERROR(err);
-    
+
     // build program
     err = clBuildProgram(container.program, 1, &container.device, NULL, NULL, NULL);
     v_build_error(container.program, container.device, err);
 
     // create kernels
-    for (size_t i=0; i<container.n_kernels; ++i) {
+    for (size_t i = 0; i < container.n_kernels; ++i) {
         container.kernels[i] = clCreateKernel(container.program, container.kernel_configs[i].kernel_name, &err);
         CHECK_CL_ERROR(err);
     }
 
     // free sources
-    for (int i=0; i<1; ++i) {
+    for (int i = 0; i < 1; ++i) {
         free(container.src_arr[i]);
         container.src_arr[i] = NULL;
     }
@@ -181,11 +183,11 @@ void cleanup() {
     printf(">> [cleanup] : start\n");
 
     // release kernels
-    for (size_t i=0; i<container.n_kernels; ++i) {
+    for (size_t i = 0; i < container.n_kernels; ++i) {
         err = clReleaseKernel(container.kernels[i]);
         CHECK_CL_ERROR(err);
     }
-    
+
     // release cl objects
     err = clReleaseProgram(container.program);
     CHECK_CL_ERROR(err);
@@ -218,26 +220,26 @@ Network networks[152]
     150, 151: v_Softmax
 */
 
-void ViT_cl (
-    ImageData* image, 
-    Network* networks, 
+void ViT_cl(
+    ImageData* image,
+    Network* networks,
     float** probabilities
-) {
+    ) {
     printf(">> [ViT_cl] : start\n");
 
     init();
-    
+
     float* layer[4];
     for (int i = 0; i < 4; i++) {
         layer[i] = (float*)malloc(sizeof(float) * size[i]);
     }
-    
+
     // encoding layer
     float* enc_layer[12];
     for (int i = 0; i < 12; i++) {
         enc_layer[i] = (float*)malloc(sizeof(float) * ENC_SIZE);
     }
-    
+
     // encoding output
     float* enc_output;
     enc_output = (float*)malloc(sizeof(float) * ENC_SIZE);
@@ -254,7 +256,7 @@ void ViT_cl (
         /*flatten and transpose*/
         float* flatten_transposed = layer[1];
         LOG("flatten_transposed", v_flatten_transpose(patch_embedded, flatten_transposed));
-        
+
         /*prepend class token*/
         float* clas_token_prepended = layer[2];
         LOG("clas_token_prepended", v_class_token(flatten_transposed, clas_token_prepended, networks[0]));
@@ -334,7 +336,7 @@ void ViT_cl (
         // load class token
         float* cls_token = (float*)malloc(sizeof(float) * EMBED_DIM);
         memcpy(cls_token, enc_output, sizeof(float) * EMBED_DIM);
-        
+
         // convert class token into output
         float* cls_output = (float*)malloc(sizeof(float) * NUM_CLASSES);
 
@@ -345,7 +347,7 @@ void ViT_cl (
             const size_t input_size = 1 * EMBED_DIM * sizeof(float);
             cl_mem m_input = clCreateBuffer(container.context, CL_MEM_READ_WRITE, input_size, NULL, &err);
             CHECK_CL_ERROR(err);
-            
+
             // weight = [out_features x in_features]
             const size_t weight_size = NUM_CLASSES * EMBED_DIM * sizeof(float);
             cl_mem m_weight = clCreateBuffer(container.context, CL_MEM_READ_WRITE, weight_size, NULL, &err);
@@ -355,7 +357,7 @@ void ViT_cl (
             const size_t bias_size = NUM_CLASSES * sizeof(float);
             cl_mem m_bias = clCreateBuffer(container.context, CL_MEM_READ_WRITE, bias_size, NULL, &err);
             CHECK_CL_ERROR(err);
-            
+
             // output = [tokens x out_features]
             const size_t output_size = 1 * NUM_CLASSES * sizeof(float);
             cl_mem m_output = clCreateBuffer(container.context, CL_MEM_READ_WRITE, output_size, NULL, &err);
@@ -370,7 +372,7 @@ void ViT_cl (
             CHECK_CL_ERROR(err);
 
             v_linear_layer(
-                m_input, m_weight, m_bias, m_output, 
+                m_input, m_weight, m_bias, m_output,
                 1, EMBED_DIM, NUM_CLASSES,
                 0, NULL, NULL
             );
@@ -378,7 +380,7 @@ void ViT_cl (
             // read result
             err = clEnqueueReadBuffer(container.queue, m_output, CL_TRUE, 0, output_size, cls_output, 0, NULL, NULL);
             CHECK_CL_ERROR(err);
-            
+
             err = clReleaseMemObject(m_input);
             CHECK_CL_ERROR(err);
             err = clReleaseMemObject(m_weight);
@@ -387,7 +389,7 @@ void ViT_cl (
             CHECK_CL_ERROR(err);
             err = clReleaseMemObject(m_output);
             CHECK_CL_ERROR(err);
-        });
+            });
 
 
         // sofemax
@@ -406,10 +408,10 @@ void ViT_cl (
 
 // image patch embedding (convolution)
 // input[IN_CAHNS][PATCH_SIZE][PATCH_SIZE] => output[EMBED_DIM][n_patch_per_image][n_patch_per_image]
-void v_Conv2d (
-    float* input, float* output, 
+void v_Conv2d(
+    float* input, float* output,
     Network weight, Network bias
-) {
+    ) {
     const int OUTPUT_SIZE = IMG_SIZE / PATCH_SIZE;
 
     // itr for output_channel
@@ -429,7 +431,7 @@ void v_Conv2d (
                             int iw = ow * PATCH_SIZE + kw;
                             int input_idx = (ic * IMG_SIZE + ih) * IMG_SIZE + iw;
                             int kernel_idx = ((oc * IN_CAHNS + ic) * PATCH_SIZE + kh) * PATCH_SIZE + kw;
-                            
+
                             // EMBED_DIM = IN_CAHNS * PATCH_SIZE * PATCH_SIZE 임
                             // input[IN_CAHNS][PATCH_SIZE][PATCH_SIZE] 로 해석
                             // weight.data[EMBED_DIM][IN_CAHNS][PATCH_SIZE][PATCH_SIZE]라고 해석
@@ -455,7 +457,7 @@ void v_Conv2d (
 /* ------------------------------------------------------------------------------ */
 // transpose + flat
 // input[EMBED_DIM][n_patch_per_image][n_patch_per_image] => output[total_num_patches][EMBED_DIM]
-void v_flatten_transpose (float* input, float* output) {
+void v_flatten_transpose(float* input, float* output) {
     int output_size = IMG_SIZE / PATCH_SIZE;
 
     for (int oh = 0; oh < output_size; oh++) {
@@ -478,10 +480,10 @@ void v_flatten_transpose (float* input, float* output) {
 /* ------------------------------------------------------------------------------ */
 // prepend class tokens in front
 // input[total_num_patches][EMBED_DIM] => output[total_num_patches + 1][EMBED_DIM]
-void v_class_token (
-    float* patch_tokens, float* final_tokens, 
+void v_class_token(
+    float* patch_tokens, float* final_tokens,
     Network cls_tk
-) {
+    ) {
     int output_size = IMG_SIZE / PATCH_SIZE;
     int num_patches = output_size * output_size;
 
@@ -499,10 +501,10 @@ void v_class_token (
 /* ------------------------------------------------------------------------------ */
 // add position embedding data
 // input[total_num_patches + 1][EMBED_DIM] => output[total_num_patches + 1][EMBED_DIM]
-void v_pos_emb (
-    float* input, float* output, 
+void v_pos_emb(
+    float* input, float* output,
     Network pos_emb
-) {
+    ) {
     int output_size = IMG_SIZE / PATCH_SIZE;
     int num_patches = output_size * output_size;
     int total_tokens = num_patches + 1;
@@ -523,16 +525,16 @@ void v_Encoder(
     float* input, float* output,
     Network ln1_w, Network ln1_b, Network attn_w, Network attn_b, Network attn_out_w, Network attn_out_b,
     Network ln2_w, Network ln2_b, Network mlp1_w, Network mlp1_b, Network mlp2_w, Network mlp2_b
-) {
+    ) {
     printf(">> [v_Encoder] started\n");
 
     int n_tokens = ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE)) + 1;
     size_t buffer_size = sizeof(float) * n_tokens * EMBED_DIM;
-    
+
     // normalize input
     float* input_normalized = (float*)malloc(buffer_size);
     LOG("input_normalized", v_layer_norm(input, input_normalized, ln1_w, ln1_b));
-    
+
     // multi-head self attention
     float* attn_out = (float*)malloc(buffer_size);
     LOG("multi-head self attention", v_multihead_attn(input_normalized, attn_out, attn_w, attn_b, attn_out_w, attn_out_b));
@@ -553,14 +555,14 @@ void v_Encoder(
 
     /*Residual2*/
     // skip connection again
-    LOG("2nd Residual1", 
+    LOG("2nd Residual1",
         for (int i = 0; i < n_tokens * EMBED_DIM; i++) {
             output[i] = residual[i] + mlp_out[i];
         }
     )
 
-    // wrap up
-    free(input_normalized);
+        // wrap up
+        free(input_normalized);
     free(attn_out);
     free(residual);
     free(residual_normalized);
@@ -574,9 +576,9 @@ void v_Encoder(
 // input[total_num_patches + 1][EMBED_DIM]
 void v_multihead_attn(
     float* input, float* output,
-    Network in_weight, Network in_bias, 
+    Network in_weight, Network in_bias,
     Network out_weight, Network out_bias
-) {
+    ) {
     const int n_tokens = ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE)) + 1;
     const int Q_dim = 0;
     const int K_dim = EMBED_DIM;
@@ -595,12 +597,12 @@ void v_multihead_attn(
 
         const size_t weight_size = EMBED_DIM * EMBED_DIM * sizeof(float);
         cl_mem m_q_weight = clCreateBuffer(container.context, CL_TRUE, weight_size, NULL, &err);
-        CHECK_CL_ERROR(err);    
+        CHECK_CL_ERROR(err);
         cl_mem m_k_weight = clCreateBuffer(container.context, CL_TRUE, weight_size, NULL, &err);
         CHECK_CL_ERROR(err);
         cl_mem m_v_weight = clCreateBuffer(container.context, CL_TRUE, weight_size, NULL, &err);
         CHECK_CL_ERROR(err);
-        
+
         const size_t bias_size = 1 * EMBED_DIM * sizeof(float);
         cl_mem m_q_bias = clCreateBuffer(container.context, CL_TRUE, bias_size, NULL, &err);
         CHECK_CL_ERROR(err);
@@ -608,7 +610,7 @@ void v_multihead_attn(
         CHECK_CL_ERROR(err);
         cl_mem m_v_bias = clCreateBuffer(container.context, CL_TRUE, bias_size, NULL, &err);
         CHECK_CL_ERROR(err);
-        
+
         const size_t output_size = n_tokens * EMBED_DIM * sizeof(float);
         cl_mem m_q_output = clCreateBuffer(container.context, CL_TRUE, output_size, NULL, &err);
         CHECK_CL_ERROR(err);
@@ -617,18 +619,18 @@ void v_multihead_attn(
         cl_mem m_v_output = clCreateBuffer(container.context, CL_TRUE, output_size, NULL, &err);
         CHECK_CL_ERROR(err);
 
-    
+
         // write
         err = clEnqueueWriteBuffer(container.queue, m_input, CL_TRUE, 0, input_size, input, 0, NULL, NULL);
         CHECK_CL_ERROR(err);
-        
+
         err = clEnqueueWriteBuffer(container.queue, m_q_weight, CL_TRUE, 0, weight_size, in_weight.data + Q_dim * EMBED_DIM, 0, NULL, NULL);
         CHECK_CL_ERROR(err);
         err = clEnqueueWriteBuffer(container.queue, m_k_weight, CL_TRUE, 0, weight_size, in_weight.data + K_dim * EMBED_DIM, 0, NULL, NULL);
         CHECK_CL_ERROR(err);
         err = clEnqueueWriteBuffer(container.queue, m_v_weight, CL_TRUE, 0, weight_size, in_weight.data + V_dim * EMBED_DIM, 0, NULL, NULL);
         CHECK_CL_ERROR(err);
-        
+
         err = clEnqueueWriteBuffer(container.queue, m_q_bias, CL_TRUE, 0, bias_size, in_bias.data + Q_dim, 0, NULL, NULL);
         CHECK_CL_ERROR(err);
         err = clEnqueueWriteBuffer(container.queue, m_k_bias, CL_TRUE, 0, bias_size, in_bias.data + K_dim, 0, NULL, NULL);
@@ -650,7 +652,7 @@ void v_multihead_attn(
         CHECK_CL_ERROR(err);
         err = clEnqueueReadBuffer(container.queue, m_v_output, CL_TRUE, 0, output_size, V, 0, NULL, NULL);
         CHECK_CL_ERROR(err);
-        
+
         // relase mem obj
         err = clReleaseMemObject(m_input);
         CHECK_CL_ERROR(err);
@@ -776,7 +778,7 @@ void v_multihead_attn(
 }
 
 
-void hmm (cl_mem m_data, size_t n_data) {
+void hmm(cl_mem m_data, size_t n_data) {
     cl_kernel k = container.kernels[__gelu];
 
     // set kernel args
@@ -784,10 +786,10 @@ void hmm (cl_mem m_data, size_t n_data) {
     //     __global float* g_data
     // ) {
     KernelArg args[] = {
-        { .size = sizeof(cl_mem), .addr = &m_data },
+        {.size = sizeof(cl_mem), .addr = &m_data },
     };
 
-    for (int i=0; i<1; ++i) {
+    for (int i = 0; i < 1; ++i) {
         err = clSetKernelArg(k, i, args[i].size, args[i].addr);
         CHECK_CL_ERROR(err);
     }
@@ -795,21 +797,21 @@ void hmm (cl_mem m_data, size_t n_data) {
     // run kerenl
     size_t global_work_size[] = { n_data };
     err = clEnqueueNDRangeKernel(
-        container.queue, k, 
-        1, NULL, global_work_size, NULL, 
+        container.queue, k,
+        1, NULL, global_work_size, NULL,
         0, NULL, NULL
-    );
+        );
     CHECK_CL_ERROR(err);
 }
 
 
 
 // multi-layer perceptron
-void v_mlp_block (
-    float* input, float* output, 
-    Network fc1_weight, Network fc1_bias, 
+void v_mlp_block(
+    float* input, float* output,
+    Network fc1_weight, Network fc1_bias,
     Network fc2_weight, Network fc2_bias
-) {
+    ) {
     int tokens = ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE)) + 1; //197
     int Embed_dim = EMBED_DIM; //768
     int hidden_dim = ((int)(EMBED_DIM * MLP_RATIO)); //3072
@@ -823,7 +825,7 @@ void v_mlp_block (
     CHECK_CL_ERROR(err);
     err = clEnqueueWriteBuffer(container.queue, m_input, CL_TRUE, 0, input_size, input, 0, NULL, NULL);
     CHECK_CL_ERROR(err);
-    
+
     // weight1
     const size_t weight1_size = hidden_dim * EMBED_DIM * sizeof(float);
     cl_mem m_weight1 = clCreateBuffer(container.context, CL_MEM_READ_WRITE, weight1_size, NULL, &err);
@@ -857,33 +859,33 @@ void v_mlp_block (
     CHECK_CL_ERROR(err);
     err = clEnqueueWriteBuffer(container.queue, m_bias2, CL_TRUE, 0, bias2_size, fc2_bias.data, 0, NULL, NULL);
     CHECK_CL_ERROR(err);
-    
+
     // output -> no write
     const size_t output_size = tokens * EMBED_DIM * sizeof(float);
     cl_mem m_output = clCreateBuffer(container.context, CL_MEM_READ_WRITE, output_size, NULL, &err);
     CHECK_CL_ERROR(err);
 
 
-    
+
     // first layer
     v_linear_layer(
-        m_input, m_weight1, m_bias1, m_mid, 
+        m_input, m_weight1, m_bias1, m_mid,
         tokens, EMBED_DIM, hidden_dim,
         0, NULL, NULL
-    );
+        );
 
     // gelu
     hmm(m_mid, mid_n_data);
 
     // second layer
     v_linear_layer(
-        m_mid, m_weight2, m_bias2, m_output, 
+        m_mid, m_weight2, m_bias2, m_output,
         tokens, hidden_dim, EMBED_DIM,
         0, NULL, NULL
-    );
+        );
 
 
-        
+
     // read result
     err = clEnqueueReadBuffer(container.queue, m_output, CL_TRUE, 0, output_size, output, 0, NULL, NULL);
     CHECK_CL_ERROR(err);
@@ -916,23 +918,57 @@ float v_gelu(float x) {
 
 /* ------------------------------------------------------------------------------ */
 //
+// Softmax 
 void v_Softmax(float* logits, float* probabilities, int length) {
-    float max_val = logits[0];
-    for (int i = 1; i < length; i++) {
-        if (logits[i] > max_val) {
-            max_val = logits[i];
-        }
-    }
+    // 1. 메모리 객체 생성 ( logits -> probabilities )
+    // logits은 입력, probabilities는 출력입니다.
+    // logits, probabilities는 Host 메모리 포인터-> Device 버퍼를 만들어 사용
 
-    float sum_exp = 0.0f;
-    for (int i = 0; i < length; i++) {
-        probabilities[i] = expf(logits[i] - max_val);
-        sum_exp += probabilities[i];
-    }
+    size_t data_size = length * sizeof(float);
 
-    for (int i = 0; i < length; i++) {
-        probabilities[i] /= sum_exp;
-    }
+    cl_mem m_input = clCreateBuffer(container.context, CL_MEM_READ_ONLY, data_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+
+    cl_mem m_output = clCreateBuffer(container.context, CL_MEM_WRITE_ONLY, data_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+
+    //Host -> Device
+    err = clEnqueueWriteBuffer(container.queue, m_input, CL_TRUE, 0, data_size, logits, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+
+    // 커널 인자 설정
+    // __kernel void softmax_kernel(in, out, N, local_cache)
+    cl_kernel k = container.kernels[__softmax];
+    int n_data = length;
+
+    size_t local_mem_size = 256 * sizeof(float);
+
+    int arg_idx = 0;
+    err = clSetKernelArg(k, arg_idx++, sizeof(cl_mem), &m_input);
+    CHECK_CL_ERROR(err);
+    err = clSetKernelArg(k, arg_idx++, sizeof(cl_mem), &m_output);
+    CHECK_CL_ERROR(err);
+    err = clSetKernelArg(k, arg_idx++, sizeof(int), &n_data);
+    CHECK_CL_ERROR(err);
+    err = clSetKernelArg(k, arg_idx++, local_mem_size, NULL); 
+    CHECK_CL_ERROR(err);
+
+    // 데이터가 1000개 정도이므로 1개의 워크그룹(256 스레드)만 띄워서 처리
+    // 커널 내부에서 반복문으로 1000개를 처리하도록 설계됨
+    //제한된 스레드 사용하면 속도 올라감
+    size_t local_work_size[] = { 256 };
+    size_t global_work_size[] = { 256 }; // 1개 워크그룹
+
+    err = clEnqueueNDRangeKernel(container.queue, k, 1, NULL, global_work_size, local_work_size, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+
+    // 5. 결과 읽기 (Device -> Host)
+    err = clEnqueueReadBuffer(container.queue, m_output, CL_TRUE, 0, data_size, probabilities, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+
+    // 6. 자원 해제
+    clReleaseMemObject(m_input);
+    clReleaseMemObject(m_output);
 }
 
 
@@ -942,10 +978,10 @@ void v_Softmax(float* logits, float* probabilities, int length) {
 
 // normalize
 // input[total_num_patches + 1][EMBED_DIM] => output[total_num_patches + 1][EMBED_DIM]
-void v_layer_norm (
-    float* input, float* output, 
+void v_layer_norm(
+    float* input, float* output,
     Network weight, Network bias
-) {
+    ) {
     const int token = N_TOTAL_TOKEN;
     const int total_num_data = token * EMBED_DIM;
 
@@ -1000,11 +1036,11 @@ void v_layer_norm (
     }
 }
 
-void v_cal_mean_and_inv_std (
+void v_cal_mean_and_inv_std(
     cl_mem m_sum, cl_mem m_sum_of_square,
     cl_mem m_mean, cl_mem m_inv_std,
     cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
-) {
+    ) {
     cl_kernel k = container.kernels[__cal_mean_and_inv_std];
 
     // set kernel args
@@ -1019,15 +1055,15 @@ void v_cal_mean_and_inv_std (
     const int embed_dim = EMBED_DIM;
     const float epsilon = EPSILON;
     KernelArg args[] = {
-        { .size = sizeof(cl_mem), .addr = &m_sum },
-        { .size = sizeof(cl_mem), .addr = &m_sum_of_square },
-        { .size = sizeof(cl_mem), .addr = &m_mean },
-        { .size = sizeof(cl_mem), .addr = &m_inv_std },
-        { .size = sizeof(int), .addr = &embed_dim },
-        { .size = sizeof(float), .addr = &epsilon },
+        {.size = sizeof(cl_mem), .addr = &m_sum },
+        {.size = sizeof(cl_mem), .addr = &m_sum_of_square },
+        {.size = sizeof(cl_mem), .addr = &m_mean },
+        {.size = sizeof(cl_mem), .addr = &m_inv_std },
+        {.size = sizeof(int), .addr = &embed_dim },
+        {.size = sizeof(float), .addr = &epsilon },
     };
 
-    for (int i=0; i<6; ++i) {
+    for (int i = 0; i < 6; ++i) {
         err = clSetKernelArg(k, i, args[i].size, args[i].addr);
         CHECK_CL_ERROR(err);
     }
@@ -1035,30 +1071,30 @@ void v_cal_mean_and_inv_std (
     // run kernel
     size_t global_work_size[] = { 1 };
     err = clEnqueueNDRangeKernel(
-        container.queue, k, 
-        1, NULL, global_work_size, NULL, 
+        container.queue, k,
+        1, NULL, global_work_size, NULL,
         e_num_waiting, e_waiting_arr, e_out
-    );
+        );
     CHECK_CL_ERROR(err);
 }
 
-void v_reduce_sum (
-    cl_mem m_data, 
-    cl_mem m_output, 
+void v_reduce_sum(
+    cl_mem m_data,
+    cl_mem m_output,
     size_t total_num_data,
     size_t work_group_size,
     cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
-) {
+    ) {
     // work_group_size는 2의 거듭제곱수여야 함
     assert(((work_group_size & (work_group_size - 1)) == 0));
-    
+
     // create memory object
     const size_t buf_size = total_num_data * sizeof(float);
     cl_mem m_from = clCreateBuffer(container.context, CL_MEM_READ_WRITE, buf_size, NULL, &err);
     CHECK_CL_ERROR(err);
     cl_mem m_to = clCreateBuffer(container.context, CL_MEM_READ_WRITE, buf_size, NULL, &err);
     CHECK_CL_ERROR(err);
-    
+
     // copy inpupt
     err = clEnqueueCopyBuffer(container.queue, m_data, m_from, 0, 0, buf_size, e_num_waiting, e_waiting_arr, NULL);
     CHECK_CL_ERROR(err);
@@ -1076,13 +1112,13 @@ void v_reduce_sum (
         //     __local float* l_sum
         // ) {
         KernelArg args[] = {
-            { .size = sizeof(cl_mem), .addr = &m_from},
-            { .size = sizeof(cl_mem), .addr = &m_to},
-            { .size = sizeof(int), .addr = &n_data},
-            { .size = sizeof(float) * work_group_size, .addr = NULL}
+            {.size = sizeof(cl_mem), .addr = &m_from},
+            {.size = sizeof(cl_mem), .addr = &m_to},
+            {.size = sizeof(int), .addr = &n_data},
+            {.size = sizeof(float) * work_group_size, .addr = NULL}
         };
 
-        for (int i=0; i<4; ++i) {
+        for (int i = 0; i < 4; ++i) {
             err = clSetKernelArg(container.kernels[__reduce_sum], i, args[i].size, args[i].addr);
             CHECK_CL_ERROR(err);
         }
@@ -1091,9 +1127,9 @@ void v_reduce_sum (
         const size_t global_work_size = n_group * work_group_size;
         const size_t local_work_size = work_group_size;
         err = clEnqueueNDRangeKernel(
-            container.queue, container.kernels[__reduce_sum], 
-            1, NULL, &global_work_size, &local_work_size, 
-            0, NULL, NULL);
+            container.queue, container.kernels[__reduce_sum],
+            1, NULL, &global_work_size, NULL,
+            0, NULL, NULL);//local work size NULL로 설정
         CHECK_CL_ERROR(err);
 
         // swap input and output buffers
@@ -1117,13 +1153,13 @@ void v_reduce_sum (
 }
 
 
-void v_reduce_sum_of_square (
-    cl_mem m_data, 
-    cl_mem m_output, 
+void v_reduce_sum_of_square(
+    cl_mem m_data,
+    cl_mem m_output,
     size_t total_num_data,
     size_t work_group_size,
     cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
-) {
+    ) {
     // work_group_size는 2의 거듭제곱수여야 함
     assert(((work_group_size & (work_group_size - 1)) == 0));
 
@@ -1134,7 +1170,7 @@ void v_reduce_sum_of_square (
     size_t data_size = total_num_data * sizeof(float);
     cl_mem m_tmp = clCreateBuffer(container.context, CL_MEM_READ_WRITE, data_size, NULL, &err);
     CHECK_CL_ERROR(err);
-    
+
     // copy data to m_tmp
     err = clEnqueueCopyBuffer(container.queue, m_data, m_tmp, 0, 0, data_size, e_num_waiting, e_waiting_arr, NULL);
     CHECK_CL_ERROR(err);
@@ -1149,10 +1185,10 @@ void v_reduce_sum_of_square (
         //     g_input[global_id] = g_input[global_id] * g_input[global_id];
         // }
         KernelArg args[] = {
-            { .size = sizeof(cl_mem), .addr = &m_tmp},
+            {.size = sizeof(cl_mem), .addr = &m_tmp},
         };
 
-        for (int i=0; i<1; ++i) {
+        for (int i = 0; i < 1; ++i) {
             err = clSetKernelArg(container.kernels[__load_square], i, args[i].size, args[i].addr);
             CHECK_CL_ERROR(err);
         }
@@ -1160,8 +1196,8 @@ void v_reduce_sum_of_square (
         // run kernel
         const size_t global_work_size = total_num_data;
         err = clEnqueueNDRangeKernel(
-            container.queue, container.kernels[__load_square], 
-            1, NULL, &global_work_size, NULL, 
+            container.queue, container.kernels[__load_square],
+            1, NULL, &global_work_size, NULL,
             0, NULL, NULL);
         CHECK_CL_ERROR(err);
     }
@@ -1175,13 +1211,13 @@ void v_reduce_sum_of_square (
 }
 
 
-void v_normalize (
-    cl_mem m_input, 
+void v_normalize(
+    cl_mem m_input,
     cl_mem m_weight, cl_mem m_bias,
     cl_mem m_mean, cl_mem m_inv_std,
     int total_num_data,
     cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
-) {
+    ) {
     // set kernel args
     // __kernel void my_normalize(
     //     __global float* g_input,
@@ -1191,13 +1227,13 @@ void v_normalize (
     //     __global float* g_INV_STD
     // ) {
     KernelArg args[] = {
-        { .size = sizeof(cl_mem), .addr = &m_input},
-        { .size = sizeof(cl_mem), .addr = &m_weight},
-        { .size = sizeof(cl_mem), .addr = &m_bias},
-        { .size = sizeof(cl_mem), .addr = &m_mean},
-        { .size = sizeof(cl_mem), .addr = &m_inv_std}
+        {.size = sizeof(cl_mem), .addr = &m_input},
+        {.size = sizeof(cl_mem), .addr = &m_weight},
+        {.size = sizeof(cl_mem), .addr = &m_bias},
+        {.size = sizeof(cl_mem), .addr = &m_mean},
+        {.size = sizeof(cl_mem), .addr = &m_inv_std}
     };
-    for (int i=0; i<5; ++i) {
+    for (int i = 0; i < 5; ++i) {
         err = clSetKernelArg(container.kernels[__normalize], i, args[i].size, args[i].addr);
         CHECK_CL_ERROR(err);
     }
@@ -1205,8 +1241,8 @@ void v_normalize (
     // run kernel
     const size_t global_work_size = total_num_data;
     err = clEnqueueNDRangeKernel(
-        container.queue, container.kernels[__normalize], 
-        1, NULL, &global_work_size, NULL, 
+        container.queue, container.kernels[__normalize],
+        1, NULL, &global_work_size, NULL,
         e_num_waiting, e_waiting_arr, e_out);
     CHECK_CL_ERROR(err);
 }
@@ -1218,11 +1254,11 @@ void v_normalize (
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // do linear transform with input matrix(network)
-void v_linear_layer (
-    cl_mem m_input, cl_mem m_weight, cl_mem m_bias, cl_mem m_output, 
+void v_linear_layer(
+    cl_mem m_input, cl_mem m_weight, cl_mem m_bias, cl_mem m_output,
     int tokens, int in_features, int out_features,
     cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
-) {
+    ) {
     const cl_kernel k = container.kernels[__linear];
 
     // set kenrl args
@@ -1236,16 +1272,16 @@ void v_linear_layer (
     // 	const int out_features      // K
     // ) {
     KernelArg args[] = {
-        { .size = sizeof(cl_mem), .addr = &m_input },
-        { .size = sizeof(cl_mem), .addr = &m_weight },
-        { .size = sizeof(cl_mem), .addr = &m_bias },
-        { .size = sizeof(cl_mem), .addr = &m_output },
-        { .size = sizeof(int), .addr = &tokens },
-        { .size = sizeof(int), .addr = &in_features },
-        { .size = sizeof(int), .addr = &out_features },
+        {.size = sizeof(cl_mem), .addr = &m_input },
+        {.size = sizeof(cl_mem), .addr = &m_weight },
+        {.size = sizeof(cl_mem), .addr = &m_bias },
+        {.size = sizeof(cl_mem), .addr = &m_output },
+        {.size = sizeof(int), .addr = &tokens },
+        {.size = sizeof(int), .addr = &in_features },
+        {.size = sizeof(int), .addr = &out_features },
     };
 
-    for (int i=0; i<7; ++i) {
+    for (int i = 0; i < 7; ++i) {
         err = clSetKernelArg(k, i, args[i].size, args[i].addr);
         CHECK_CL_ERROR(err);
     }
@@ -1256,14 +1292,14 @@ void v_linear_layer (
         container.queue, k,
         2, NULL, gloabal_work_size, NULL,
         e_num_waiting, e_waiting_arr, e_out
-    );
+        );
     CHECK_CL_ERROR(err);
 }
 
-void matrix_plus (
-    float* input1, float* input2, float* output, 
+void matrix_plus(
+    float* input1, float* input2, float* output,
     size_t n_data
-) {
+    ) {
     // create memory objects
     size_t buf_size = n_data * sizeof(float);
     cl_mem m_input1 = clCreateBuffer(container.context, CL_MEM_READ_WRITE, buf_size, NULL, &err);
@@ -1286,12 +1322,12 @@ void matrix_plus (
     //     __global float* g_C
     // ) {
     KernelArg args[] = {
-        { .size = sizeof(cl_mem), .addr = &m_input1 },
-        { .size = sizeof(cl_mem), .addr = &m_input2 },
-        { .size = sizeof(cl_mem), .addr = &m_output }
+        {.size = sizeof(cl_mem), .addr = &m_input1 },
+        {.size = sizeof(cl_mem), .addr = &m_input2 },
+        {.size = sizeof(cl_mem), .addr = &m_output }
     };
 
-    for (int i=0; i<3; ++i) {
+    for (int i = 0; i < 3; ++i) {
         err = clSetKernelArg(container.kernels[__matrix_plus], i, args[i].size, args[i].addr);
         CHECK_CL_ERROR(err);
     }
@@ -1299,10 +1335,10 @@ void matrix_plus (
     // run kernel
     size_t gloabl_work_size[] = { n_data };
     err = clEnqueueNDRangeKernel(
-        container.queue, container.kernels[__matrix_plus], 
-        1, NULL, gloabl_work_size, NULL, 
-        0,NULL, NULL
-    );
+        container.queue, container.kernels[__matrix_plus],
+        1, NULL, gloabl_work_size, NULL,
+        0, NULL, NULL
+        );
     CHECK_CL_ERROR(err);
 
     // read reuslt
