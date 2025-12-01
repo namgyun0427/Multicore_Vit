@@ -678,20 +678,14 @@ void v_multihead_attn(
 
 
 
-    // attn_output[n_tokens][EMBED_DIM]
-    float* attn_output = (float*)malloc(sizeof(float) * n_tokens * EMBED_DIM);
-    for (int i = 0; i < n_tokens * EMBED_DIM; i++) {
-        attn_output[i] = 0.0f;
-    }
-
     // calculate multi-head self attention
     int head_dim = EMBED_DIM / NUM_HEADS;
+    float* scores = (float*)malloc(sizeof(float) * n_tokens * n_tokens);
+    float* head_out = (float*)malloc(sizeof(float) * n_tokens * head_dim);
+    float* attn_output = (float*)malloc(sizeof(float) * n_tokens * EMBED_DIM);
+
     for (int h = 0; h < NUM_HEADS; h++) {
         int head_offset = h * head_dim;
-
-        // scores[tokens][tokens]
-        float* scores = (float*)malloc(sizeof(float) * n_tokens * n_tokens);
-
         // calcuate socres: scaled-dot-product Q and K
         for (int i = 0; i < n_tokens; i++) {
             for (int j = 0; j < n_tokens; j++) {
@@ -706,33 +700,42 @@ void v_multihead_attn(
                 scores[i * n_tokens + j] = score / sqrtf((float)head_dim);
             }
         }
+        size_t data_size = n_tokens * n_tokens * sizeof(float);
 
-        // v_Softmax scores
-        for (int i = 0; i < n_tokens; i++) {
-            // get max value of 1 score row
-            float max_val = scores[i * n_tokens];
-            for (int j = 1; j < n_tokens; j++) {
-                if (scores[i * n_tokens + j] > max_val) {
-                    max_val = scores[i * n_tokens + j];
-                }
-            }
+        // 버퍼 생성
+        cl_mem m_scores = clCreateBuffer(container.context, CL_MEM_READ_WRITE, data_size, NULL, &err);
+        CHECK_CL_ERROR(err);
 
-            // score[i][j] = e^(score[i][j] - max_score)
-            // cal sum of them
-            float sum_exp = 0.0f;
-            for (int j = 0; j < n_tokens; j++) {
-                scores[i * n_tokens + j] = expf(scores[i * n_tokens + j] - max_val);
-                sum_exp += scores[i * n_tokens + j];
-            }
+        err = clEnqueueWriteBuffer(container.queue, m_scores, CL_TRUE, 0, data_size, scores, 0, NULL, NULL);
+        CHECK_CL_ERROR(err);
 
-            // normalzie
-            for (int j = 0; j < n_tokens; j++) {
-                scores[i * n_tokens + j] /= sum_exp;
-            }
-        }
+        // 커널 설정
+        cl_kernel k = container.kernels[__softmax];
+        int cols = n_tokens;
+        size_t local_mem_size = 256 * sizeof(float);
+
+        int arg_idx = 0;
+        err = clSetKernelArg(k, arg_idx++, sizeof(cl_mem), &m_scores); // Input
+        CHECK_CL_ERROR(err);
+        err = clSetKernelArg(k, arg_idx++, sizeof(cl_mem), &m_scores); // Output (In-place)
+        CHECK_CL_ERROR(err);
+        err = clSetKernelArg(k, arg_idx++, sizeof(int), &cols);
+        CHECK_CL_ERROR(err);
+        err = clSetKernelArg(k, arg_idx++, local_mem_size, NULL);
+        CHECK_CL_ERROR(err);
+        size_t local_work_size[] = { 256 };
+        size_t global_work_size[] = { (size_t)n_tokens * 256 };
+
+        err = clEnqueueNDRangeKernel(container.queue, k, 1, NULL, global_work_size, local_work_size, 0, NULL, NULL);
+        CHECK_CL_ERROR(err);
+
+        err = clEnqueueReadBuffer(container.queue, m_scores, CL_TRUE, 0, data_size, scores, 0, NULL, NULL);
+        CHECK_CL_ERROR(err);
+
+        clReleaseMemObject(m_scores);
+        
 
         // calculate result
-        float* head_out = (float*)malloc(sizeof(float) * n_tokens * head_dim);
         for (int i = 0; i < n_tokens; i++) {
             for (int d = 0; d < head_dim; d++) {
                 float sum = 0.0f;
@@ -752,14 +755,9 @@ void v_multihead_attn(
             }
         }
 
-        free(scores);
-        free(head_out);
     }
 
-    free(Q); free(K); free(V);
-
-
-
+    
     // convert attn_output into output space
     // TODO: convert below using v_lyneaer_
     for (int t = 0; t < n_tokens; t++) {
@@ -774,7 +772,11 @@ void v_multihead_attn(
     }
 
     // wrap up
+    free(scores);
+    free(head_out);
     free(attn_output);
+    free(Q); free(K); free(V);
+
 }
 
 
