@@ -935,7 +935,7 @@ void v_Softmax(float* logits, float* probabilities, int length) {
     CHECK_CL_ERROR(err);
 
     //Host -> Device
-    err = clEnqueueWriteBuffer(container.queue, m_input, CL_TRUE, 0, data_size, logits, 0, NULL, NULL);
+    err= clEnqueueWriteBuffer(container.queue, m_input, CL_TRUE, 0, data_size, logits, 0, NULL, NULL);
     CHECK_CL_ERROR(err);
 
     // 커널 인자 설정
