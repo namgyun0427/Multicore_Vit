@@ -21,18 +21,3 @@ __kernel void cal_score (
 
     g_scores[i * N_TOTAL_TOKEN + j] = score / scale;
 }
-
-
-// for (int i = 0; i < n_tokens; i++) {
-//     for (int j = 0; j < n_tokens; j++) {
-//         float score = 0.0f;
-
-//         for (int d = 0; d < HEAD_DIM; d++) {
-//             float q = Q[i * EMBED_DIM + head_offset + d];
-//             float k = K[j * EMBED_DIM + head_offset + d];
-//             score += q * k;
-//         }
-
-//         scores[i * n_tokens + j] = score / sqrtf((float)HEAD_DIM);
-//     }
-// }

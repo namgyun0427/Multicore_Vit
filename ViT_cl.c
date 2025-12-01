@@ -7,13 +7,12 @@ v_ 로 시작하게끔 함수이름 변경
 cl 메모리 객체 관련해서도 => 일단 지금은 "m_"으로 시작하는 경로 통일
 커널을 쓰는 함수에 대해서도 네이밍 컨벤션?
 
-커널 setArg하는 부분에 kenrl 정의부만 복붙?
 
-커널 인자 세팅도 함수로 뺄 수 있나?
+커널 하나당 wrppaer 함수 같이 만들어서 시그너쳐를 이용해서 매개변수 정보를 제공하는 쪽이 좋은 듯
 
 work_group_size 최대 크기 가져오기?
 
-
+reducing 을 2차원으로??
 
 테스트 어떻게 하지...? 그냥 static 말고 깡 전역으로 conatiner 선언하고 extern 으로 받아서 써야하나
 
@@ -22,6 +21,8 @@ work_group_size 최대 크기 가져오기?
 // TODO: matrix_plus 함수 cl_mem 받도록
 // TODO: position embedding 함수 matrix_plus쓰는 편으로 변경
 // TODO: Network 담을 buffer init에서 생성 및 초기화
+
+
 
 ////////////////////////////////////////////////////////////////////////////////////
 // constants
@@ -42,7 +43,7 @@ static const int ENC_SIZE = EMBED_DIM * ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / P
 // Kernels_idxs와 kernel_configs의 순서가 맞아야 함
 // kernel_configs 를 순회해서 각 file_path 별로 소스 코드를 뽑아서 빌드함
 
-#define N_KERNEL 9
+#define N_KERNEL 12
 
 enum Kernels_idxs{
     __reduce_sum = 0,
@@ -54,6 +55,9 @@ enum Kernels_idxs{
     __cal_mean_and_inv_std,
     __gelu,
     __cal_score,
+    __convert_score,
+    __normalize_score,
+    __cal_result,
 };
 
 static Kernel_config kernel_configs[N_KERNEL] = {
@@ -65,9 +69,11 @@ static Kernel_config kernel_configs[N_KERNEL] = {
     { .kernel_name = "linear", .file_path = "./kernels/linear.cl" },
     { .kernel_name = "cal_mean_and_inv_std", .file_path = "./kernels/cal_mean_and_inv_std.cl" },
     { .kernel_name = "gelu", .file_path = "./kernels/gelu.cl" },
-    { .kernel_name = "cal_score", .file_path = "./kernels/cal_score.cl" },
+    { .kernel_name = "cal_score", .file_path = "./kernels/multihead_attrention/cal_score.cl" },
+    { .kernel_name = "convert_score", .file_path = "./kernels/multihead_attrention/convert_score.cl" },
+    { .kernel_name = "normalize_score", .file_path = "./kernels/multihead_attrention/normalize_score.cl" },
+    { .kernel_name = "cal_result", .file_path = "./kernels/multihead_attrention/cal_result.cl" },
 };
-
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -630,10 +636,18 @@ void v_multihead_attn(
     cl_mem m_v_output = clCreateBuffer(container.context, CL_TRUE, output_size, NULL, &err);
     CHECK_CL_ERROR(err);
 
-    // craete mem obj
     size_t scores_size = sizeof(float) * N_TOTAL_TOKEN * N_TOTAL_TOKEN;
     cl_mem m_scores = clCreateBuffer(container.context, CL_MEM_READ_WRITE, scores_size, NULL, &err);
     CHECK_CL_ERROR(err);
+
+    const size_t max_val_size = N_TOTAL_TOKEN * sizeof(float);
+    cl_mem m_max_val = clCreateBuffer(container.context, CL_MEM_READ_WRITE, max_val_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+
+    const size_t attn_output_size = N_TOTAL_TOKEN * EMBED_DIM * sizeof(float);
+    cl_mem m_attn_output = clCreateBuffer(container.context, CL_MEM_READ_WRITE, attn_output_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+
 
 
     // calculate QKV
@@ -713,49 +727,168 @@ void v_multihead_attn(
 
 
 
-
-        // v_Softmax scores
-        for (int i = 0; i < N_TOTAL_TOKEN; i++) {
+        // normalize scores
+        {
             // get max value of 1 score row
-            // 커널로 돌리려면 머리좀 아프겠는데;;
-            float max_val = scores[i * N_TOTAL_TOKEN];
-            for (int j = 1; j < N_TOTAL_TOKEN; j++) {
-                if (scores[i * N_TOTAL_TOKEN + j] > max_val) {
-                    max_val = scores[i * N_TOTAL_TOKEN + j];
+            // TODO: 커널로 돌리려면 머리좀 아프겠는데;; -> 리듕싱 어떻게 잘
+            float* p_max_val = (float*)calloc(N_TOTAL_TOKEN, sizeof(float));
+            for (int i = 0; i < N_TOTAL_TOKEN; i++) {
+                p_max_val[i] = FLT_MIN;
+            }
+            for (int i = 0; i < N_TOTAL_TOKEN; i++) {
+                for (int j = 1; j < N_TOTAL_TOKEN; j++) {
+                    if (scores[i * N_TOTAL_TOKEN + j] > p_max_val[i]) {
+                        p_max_val[i] = scores[i * N_TOTAL_TOKEN + j];
+                    }
                 }
             }
 
-            // score[i][j] = e^(score[i][j] - max_score)
-            // cal sum of them
-            float sum_exp = 0.0f;
-            for (int j = 0; j < N_TOTAL_TOKEN; j++) {
-                scores[i * N_TOTAL_TOKEN + j] = expf(scores[i * N_TOTAL_TOKEN + j] - max_val);
-                sum_exp += scores[i * N_TOTAL_TOKEN + j];
+
+            /* =========================================================================== */
+
+            err = clEnqueueWriteBuffer(container.queue, m_max_val, CL_TRUE, 0, max_val_size, p_max_val, 0, NULL, NULL);
+            CHECK_CL_ERROR(err);
+
+            {
+                cl_kernel k = container.kernels[__convert_score];
+
+                // set kernel args
+                // __kernel void convert_score (
+                //     __global float* g_scores,
+                //     __global float* g_max_val
+                // ) {
+                KernelArg args[] = {
+                    { .size = sizeof(cl_mem), .addr = &m_scores },
+                    { .size = sizeof(cl_mem), .addr = &m_max_val },
+                };
+
+                for (int i=0; i<2; ++i) {
+                    err = clSetKernelArg(k, i, args[i].size, args[i].addr);
+                    CHECK_CL_ERROR(err);
+                }
+
+                // run kernel
+                const size_t dim_config[] = { N_TOTAL_TOKEN, N_TOTAL_TOKEN };
+                err = clEnqueueNDRangeKernel(container.queue, k, 2, NULL, dim_config, NULL, 0, NULL, NULL);
+                CHECK_CL_ERROR(err);
             }
 
-            // normalzie
-            for (int j = 0; j < N_TOTAL_TOKEN; j++) {
-                scores[i * N_TOTAL_TOKEN + j] /= sum_exp;
+            /* =========================================================================== */
+
+            // 흠 지금 reduce_sum은 1차원 밖에 안되는데...
+            // TODO: reduce_sum_2d 를 만드는 게 맞을 듯
+            // 대충 m_sum_exp 계싼했다고 치면
+            // v_reduce_sum(m_scores, )
+
+
+
+            // 총합들 계산
+            const size_t sum_exp_size = N_TOTAL_TOKEN * sizeof(float);
+            cl_mem m_sum_exp = clCreateBuffer(container.context, CL_MEM_READ_WRITE, sum_exp_size, NULL, &err);
+            CHECK_CL_ERROR(err);
+
+
+
+            
+
+
+            // score[i][j] = e^(score[i][j] - max_score) + cal sum of them
+            float* p_sum_exp = (float*)calloc(N_TOTAL_TOKEN, sizeof(float));    
+            for (int i = 0; i < N_TOTAL_TOKEN; i++) {
+                p_sum_exp[i] = 0.0f;
             }
+
+            for (int i = 0; i < N_TOTAL_TOKEN; i++) {
+                for (int j = 0; j < N_TOTAL_TOKEN; j++) {
+                    scores[i * N_TOTAL_TOKEN + j] = expf(scores[i * N_TOTAL_TOKEN + j] - p_max_val[i]);
+                    p_sum_exp[i] += scores[i * N_TOTAL_TOKEN + j];
+                }
+            }
+            
+
+
+
+
+
+            /* =========================================================================== */
+
+            {
+                cl_kernel k = container.kernels[__normalize_score];
+
+                // set kenrl args
+                // __kernel void normalize_score (
+                //     __global float* g_scores,
+                //     __global float* g_sum_exp
+                // ) {
+                KernelArg args[] = {
+                    { .size = sizeof(cl_mem), .addr = &m_scores },
+                    { .size = sizeof(cl_mem), .addr = &m_sum_exp },
+                };
+
+                for (int i=0; i<2; ++i) {
+                    err = clSetKernelArg(k, i, args[i].size, args[i].addr);
+                    CHECK_CL_ERROR(err);
+                }
+
+                // run kernel
+                const size_t dim_config[] = { N_TOTAL_TOKEN, N_TOTAL_TOKEN };
+                err = clEnqueueNDRangeKernel(container.queue, k, 2, NULL, dim_config, NULL, 0, NULL, NULL);
+                CHECK_CL_ERROR(err);
+            }
+
+            
+            // read result
+            err = clEnqueueReadBuffer(container.queue, m_scores, CL_TRUE, 0, scores_size, scores, 0, NULL, NULL);
+            CHECK_CL_ERROR(err);
         }
+
+
+        
 
         // calculate result
-        for (int i = 0; i < N_TOTAL_TOKEN; i++) {
-            for (int d = 0; d < HEAD_DIM; d++) {
-                float sum = 0.0f;
+        {
+            cl_kernel k = container.kernels[__cal_result];
 
-                for (int j = 0; j < N_TOTAL_TOKEN; j++) {
-                    sum += scores[i * N_TOTAL_TOKEN + j] * V[j * EMBED_DIM + head_offset + d];
-                }
+            // set kernel args
+            // __kernel void cal_result(
+            // 	__global float* g_scores,
+            // 	__global float* g_V,
+            // 	__global float* g_attn_output,
+            // 	int EMBED_DIM,
+            // 	int head_offset
+            // ) {
+            int embed_dim = EMBED_DIM;
+            KernelArg args[] = {
+                { .size = sizeof(cl_mem), .addr = &m_scores },
+                { .size = sizeof(cl_mem), .addr = &m_v_output },
+                { .size = sizeof(cl_mem), .addr = &m_attn_output },
+                { .size = sizeof(int), .addr = &embed_dim },
+                { .size = sizeof(int), .addr = &head_offset },
+            };
 
-                attn_output[i * EMBED_DIM + head_offset + d] = sum;
+            for (int i=0; i<5; ++i) {
+                err = clSetKernelArg(k, i, args[i].size, args[i].addr);
+                CHECK_CL_ERROR(err);
             }
+
+            // run kernel
+            const size_t dim_config[] = { N_TOTAL_TOKEN, HEAD_DIM };
+            err = clEnqueueNDRangeKernel(container.queue, k, 2, NULL, dim_config, NULL, 0, NULL, NULL);
+            CHECK_CL_ERROR(err);
         }
+
+        // read result -> 이거 위험할지도? 여기서 계산안되는 것들도 누적해야 하는데
+        err = clEnqueueReadBuffer(container.queue, m_attn_output, CL_TRUE, 0, attn_output_size, attn_output, 0, NULL, NULL);
+        CHECK_CL_ERROR(err);
+
+
+
+        // release?
+
+
 
     }
     
-    
-
 
 
     // convert attn_output into output space
@@ -793,6 +926,10 @@ void v_multihead_attn(
     err = clReleaseMemObject(m_v_output);
     CHECK_CL_ERROR(err);
     err = clReleaseMemObject(m_scores);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_max_val);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_attn_output);
     CHECK_CL_ERROR(err);
 
 
