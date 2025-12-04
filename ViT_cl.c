@@ -683,9 +683,6 @@ void v_multihead_attn(
         CHECK_CL_ERROR(err);
     }
 
-
-
-    // calculate multi-head self attention
     int head_dim = EMBED_DIM / NUM_HEADS;
     float* scores = (float*)malloc(sizeof(float) * n_tokens * n_tokens);
     float* head_out = (float*)malloc(sizeof(float) * n_tokens * head_dim);
@@ -693,9 +690,9 @@ void v_multihead_attn(
 
     for (int h = 0; h < NUM_HEADS; h++) {
         int head_offset = h * head_dim;
+
         float* scores = (float*)malloc(sizeof(float) * n_tokens * n_tokens);
 
-        // calcuate socres: scaled-dot-product Q and K
         for (int i = 0; i < n_tokens; i++) {
             for (int j = 0; j < n_tokens; j++) {
                 float score = 0.0f;
@@ -709,6 +706,7 @@ void v_multihead_attn(
                 scores[i * n_tokens + j] = score / sqrtf((float)head_dim);
             }
         }
+
         // v_Softmax scores
         {
             size_t data_size = n_tokens * n_tokens * sizeof(float);
@@ -902,8 +900,8 @@ float v_gelu(float x) {
 //
 // Softmax 
 void v_Softmax(float* logits, float* probabilities, int length) {
-    // 1. 메모리 객체 생성 ( logits -> probabilities )
-    // logits은 입력, probabilities는 출력입니다.
+    // 메모리 객체 생성 ( logits -> probabilities )
+    // logits은 입력, probabilities는 출력
     // logits, probabilities는 Host 메모리 포인터-> Device 버퍼를 만들어 사용
 
     size_t data_size = length * sizeof(float);
@@ -915,7 +913,7 @@ void v_Softmax(float* logits, float* probabilities, int length) {
     CHECK_CL_ERROR(err);
 
     //Host -> Device
-    err= clEnqueueWriteBuffer(container.queue, m_input, CL_TRUE, 0, data_size, logits, 0, NULL, NULL);
+    err = clEnqueueWriteBuffer(container.queue, m_input, CL_TRUE, 0, data_size, logits, 0, NULL, NULL);
     CHECK_CL_ERROR(err);
 
     // 커널 인자 설정
@@ -932,11 +930,11 @@ void v_Softmax(float* logits, float* probabilities, int length) {
     CHECK_CL_ERROR(err);
     err = clSetKernelArg(k, arg_idx++, sizeof(int), &n_data);
     CHECK_CL_ERROR(err);
-    err = clSetKernelArg(k, arg_idx++, local_mem_size, NULL); 
+    err = clSetKernelArg(k, arg_idx++, local_mem_size, NULL);
     CHECK_CL_ERROR(err);
 
     // 데이터가 1000개 정도이므로 1개의 워크그룹(256 스레드)만 띄워서 처리
-    // 커널 내부에서 반복문으로 1000개를 처리하도록 설계됨
+    // 커널 내부에서 반복문으로 1000개를 처리하도록 설계
     //제한된 스레드 사용하면 속도 올라감
     size_t local_work_size[] = { 256 };
     size_t global_work_size[] = { 256 }; // 1개 워크그룹
@@ -952,6 +950,7 @@ void v_Softmax(float* logits, float* probabilities, int length) {
     clReleaseMemObject(m_input);
     clReleaseMemObject(m_output);
 }
+
 
 
 
