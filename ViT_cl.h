@@ -56,6 +56,38 @@ typedef struct KernelArg {
     const void* addr;
 } KernelArg;
 
+/////////////////////////////////////////////////////////////////////////////
+// export global variables
+
+extern CL_container container;
+extern cl_int err;
+
+
+/////////////////////////////////////////////////////////////////////////////
+// kernel configuration
+// 커널 개수 알맞게 바꾸고, enum 및 필요 정보 추가
+// Kernels_idxs와 kernel_configs의 순서가 맞아야 함
+// kernel_configs 를 순회해서 각 file_path 별로 소스 코드를 뽑아서 빌드함
+
+#define N_KERNEL 14
+
+enum Kernels_idxs {
+    __reduce_sum = 0,
+    __load_square,
+    __normalize,
+    __matrix_plus,
+    __cl_matrix_plus,
+    __linear,
+    __cal_mean_and_inv_std,
+    __gelu,
+    __cal_score,
+    __convert_score,
+    __normalize_score,
+    __cal_result,
+    __softmax,
+    __softmax_score,
+};
+
 
 /////////////////////////////////////////////////////////////////////////////
 // macro function
@@ -135,12 +167,6 @@ void matrix_plus (
     float* input1, float* input2, float* output, 
     size_t n_data
 );
-
-// void cl_matrix_plus (
-//     cl_mem m_lvalue, cl_mem m_rvalue, 
-//     size_t n_data, 
-//     cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
-// );
 
 void v_linear_layer (
     cl_mem m_input, cl_mem m_weight, cl_mem m_bias, cl_mem m_output, 

@@ -15,7 +15,8 @@ IN_OBJ = \
 	comparator.c \
 	Network.c \
 	ViT_seq.c \
-	ViT_cl.c
+	ViT_cl.c \
+	v_multihead_attn.c
 
 OUT_OBJ = $(patsubst %.c, $(OUT_DIR_OBJ)/%.o, $(IN_OBJ))
 
