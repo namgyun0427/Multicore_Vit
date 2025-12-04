@@ -16,7 +16,10 @@ IN_OBJ = \
 	Network.c \
 	ViT_seq.c \
 	ViT_cl.c \
-	v_multihead_attn.c
+	v_multihead_attn.c \
+	v_layer_norm.c \
+	v_linear_layer.c \
+	v_mlp_block.c
 
 OUT_OBJ = $(patsubst %.c, $(OUT_DIR_OBJ)/%.o, $(IN_OBJ))
 
