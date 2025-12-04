@@ -73,6 +73,7 @@ static Kernel_config kernel_configs[N_KERNEL] = {
 
 
 
+
 /////////////////////////////////////////////////////////////////////////////
 // global variables
 
@@ -403,6 +404,7 @@ void ViT_cl(
     for (int i = 0; i < 4; i++) free(layer[i]);
     for (int i = 0; i < 12; i++) free(enc_layer[i]);
     free(enc_output);
+
     cleanup();
 
     printf(">> [ViT_cl] : ended\n");
@@ -758,6 +760,7 @@ void v_multihead_attn(
     free(scores); free(head_out); free(attn_output); free(Q); free(K); free(V);
 }
 
+
 void hmm(cl_mem m_data, size_t n_data) {
     cl_kernel k = container.kernels[__gelu];
 
@@ -900,8 +903,8 @@ float v_gelu(float x) {
 //
 // Softmax 
 void v_Softmax(float* logits, float* probabilities, int length) {
-    // 메모리 객체 생성 ( logits -> probabilities )
-    // logits은 입력, probabilities는 출력
+    // 1. 메모리 객체 생성 ( logits -> probabilities )
+    // logits은 입력, probabilities는 출력입니다.
     // logits, probabilities는 Host 메모리 포인터-> Device 버퍼를 만들어 사용
 
     size_t data_size = length * sizeof(float);
@@ -934,7 +937,7 @@ void v_Softmax(float* logits, float* probabilities, int length) {
     CHECK_CL_ERROR(err);
 
     // 데이터가 1000개 정도이므로 1개의 워크그룹(256 스레드)만 띄워서 처리
-    // 커널 내부에서 반복문으로 1000개를 처리하도록 설계
+    // 커널 내부에서 반복문으로 1000개를 처리하도록 설계됨
     //제한된 스레드 사용하면 속도 올라감
     size_t local_work_size[] = { 256 };
     size_t global_work_size[] = { 256 }; // 1개 워크그룹
@@ -1109,8 +1112,8 @@ void v_reduce_sum(
         const size_t local_work_size = work_group_size;
         err = clEnqueueNDRangeKernel(
             container.queue, container.kernels[__reduce_sum],
-            1, NULL, &global_work_size, NULL,
-            0, NULL, NULL);//local work size NULL로 설정
+            1, NULL, &global_work_size, &local_work_size,
+            0, NULL, NULL);
         CHECK_CL_ERROR(err);
 
         // swap input and output buffers
@@ -1376,5 +1379,4 @@ void matrix_plus(
 //     );
 //     CHECK_CL_ERROR(err);
 // }
-
 
