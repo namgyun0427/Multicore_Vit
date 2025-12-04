@@ -578,8 +578,8 @@ void v_Encoder(
         }
     )
 
-        // wrap up
-        free(input_normalized);
+    // wrap up
+    free(input_normalized);
     free(attn_out);
     free(residual);
     free(residual_normalized);
@@ -785,17 +785,17 @@ void v_multihead_attn(
             }
 
     int head_dim = EMBED_DIM / NUM_HEADS;
-    float* scores = (float*)malloc(sizeof(float) * n_tokens * n_tokens);
-    float* head_out = (float*)malloc(sizeof(float) * n_tokens * head_dim);
-    float* attn_output = (float*)malloc(sizeof(float) * n_tokens * EMBED_DIM);
+    float* scores = (float*)malloc(sizeof(float) * N_TOTAL_TOKEN * N_TOTAL_TOKEN);
+    float* head_out = (float*)malloc(sizeof(float) * N_TOTAL_TOKEN * head_dim);
+    float* attn_output = (float*)malloc(sizeof(float) * N_TOTAL_TOKEN * EMBED_DIM);
 
     for (int h = 0; h < NUM_HEADS; h++) {
         int head_offset = h * head_dim;
 
-        float* scores = (float*)malloc(sizeof(float) * n_tokens * n_tokens);
+        float* scores = (float*)malloc(sizeof(float) * N_TOTAL_TOKEN * N_TOTAL_TOKEN);
 
-        for (int i = 0; i < n_tokens; i++) {
-            for (int j = 0; j < n_tokens; j++) {
+        for (int i = 0; i < N_TOTAL_TOKEN; i++) {
+            for (int j = 0; j < N_TOTAL_TOKEN; j++) {
                 float score = 0.0f;
 
                 for (int d = 0; d < head_dim; d++) {
@@ -804,19 +804,19 @@ void v_multihead_attn(
                     score += q * k;
                 }
 
-                scores[i * n_tokens + j] = score / sqrtf((float)head_dim);
+                scores[i * N_TOTAL_TOKEN + j] = score / sqrtf((float)head_dim);
             }
         }
 
         // v_Softmax scores
         {
-            size_t data_size = n_tokens * n_tokens * sizeof(float);
+            size_t data_size = N_TOTAL_TOKEN * N_TOTAL_TOKEN * sizeof(float);
 
             cl_mem m_scores = clCreateBuffer(container.context, CL_MEM_READ_WRITE, data_size, NULL, &err);
             clEnqueueWriteBuffer(container.queue, m_scores, CL_TRUE, 0, data_size, scores, 0, NULL, NULL);
 
             cl_kernel k = container.kernels[__softmax_score];
-            int cols = n_tokens; 
+            int cols = N_TOTAL_TOKEN; 
             size_t local_mem_size = 256 * sizeof(float);
 
             int arg_idx = 0;
@@ -824,7 +824,7 @@ void v_multihead_attn(
             clSetKernelArg(k, arg_idx++, sizeof(int), &cols);
             clSetKernelArg(k, arg_idx++, local_mem_size, NULL);
             size_t local_work_size[] = { 256 };
-            size_t global_work_size[] = { (size_t)n_tokens * 256 };
+            size_t global_work_size[] = { (size_t)N_TOTAL_TOKEN * 256 };
 
             clEnqueueNDRangeKernel(container.queue, k, 1, NULL, global_work_size, local_work_size, 0, NULL, NULL);
 
@@ -834,21 +834,21 @@ void v_multihead_attn(
         }
 
         // 3. Output Calculation (CPU)
-        for (int i = 0; i < n_tokens; i++) {
+        for (int i = 0; i < N_TOTAL_TOKEN; i++) {
             for (int d = 0; d < head_dim; d++) {
                 float sum = 0.0f;
-                for (int j = 0; j < n_tokens; j++) {
-                    sum += scores[i * n_tokens + j] * V[j * EMBED_DIM + head_offset + d];
+                for (int j = 0; j < N_TOTAL_TOKEN; j++) {
+                    sum += scores[i * N_TOTAL_TOKEN + j] * V[j * EMBED_DIM + head_offset + d];
                 }
                 head_out[i * head_dim + d] = sum;
             }
         }
-        for (int i = 0; i < n_tokens; i++) {
+        for (int i = 0; i < N_TOTAL_TOKEN; i++) {
             for (int d = 0; d < head_dim; d++) attn_output[i * EMBED_DIM + head_offset + d] = head_out[i * head_dim + d];
         }
     }
 
-    for (int t = 0; t < n_tokens; t++) {
+    for (int t = 0; t < N_TOTAL_TOKEN; t++) {
         for (int i = 0; i < EMBED_DIM; i++) {
             float sum = out_bias.data[i];
             for (int j = 0; j < EMBED_DIM; j++) sum += attn_output[t * EMBED_DIM + j] * out_weight.data[i * EMBED_DIM + j];
