@@ -59,6 +59,7 @@ enum Kernels_idxs {
     __normalize_score,
     __cal_result,
     __softmax,
+    __softmax_score,
 };
 
 static Kernel_config kernel_configs[N_KERNEL] = {
@@ -75,7 +76,10 @@ static Kernel_config kernel_configs[N_KERNEL] = {
     { .kernel_name = "normalize_score", .file_path = "./kernels/multihead_attrention/normalize_score.cl" },
     { .kernel_name = "cal_result", .file_path = "./kernels/multihead_attrention/cal_result.cl" },
     {.kernel_name = "softmax_kernel", .file_path = "./kernels/softmax.cl" },
+     {.kernel_name = "softmax_score_kernel", .file_path = "./kernels/softmax_score.cl" },
 };
+
+
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -402,7 +406,12 @@ void ViT_cl(
 
         // sofemax
         LOG("sofemax", v_Softmax(cls_output, probabilities[i], NUM_CLASSES));
+        free(cls_token);
+        free(cls_output);
     }
+    for (int i = 0; i < 4; i++) free(layer[i]);
+    for (int i = 0; i < 12; i++) free(enc_layer[i]);
+    free(enc_output);
 
     cleanup();
 
@@ -775,171 +784,106 @@ void v_multihead_attn(
                 CHECK_CL_ERROR(err);
             }
 
-            /* =========================================================================== */
+    int head_dim = EMBED_DIM / NUM_HEADS;
+    float* scores = (float*)malloc(sizeof(float) * n_tokens * n_tokens);
+    float* head_out = (float*)malloc(sizeof(float) * n_tokens * head_dim);
+    float* attn_output = (float*)malloc(sizeof(float) * n_tokens * EMBED_DIM);
 
-            // 흠 지금 reduce_sum은 1차원 밖에 안되는데...
-            // TODO: reduce_sum_2d 를 만드는 게 맞을 듯
-            // 대충 m_sum_exp 계싼했다고 치면
-            // v_reduce_sum(m_scores, )
+    for (int h = 0; h < NUM_HEADS; h++) {
+        int head_offset = h * head_dim;
 
+        float* scores = (float*)malloc(sizeof(float) * n_tokens * n_tokens);
 
+        for (int i = 0; i < n_tokens; i++) {
+            for (int j = 0; j < n_tokens; j++) {
+                float score = 0.0f;
 
-            // 총합들 계산
-            const size_t sum_exp_size = N_TOTAL_TOKEN * sizeof(float);
-            cl_mem m_sum_exp = clCreateBuffer(container.context, CL_MEM_READ_WRITE, sum_exp_size, NULL, &err);
-            CHECK_CL_ERROR(err);
-
-
-
-            
-
-
-            // score[i][j] = e^(score[i][j] - max_score) + cal sum of them
-            float* p_sum_exp = (float*)calloc(N_TOTAL_TOKEN, sizeof(float));    
-            for (int i = 0; i < N_TOTAL_TOKEN; i++) {
-                p_sum_exp[i] = 0.0f;
-            }
-
-            for (int i = 0; i < N_TOTAL_TOKEN; i++) {
-                for (int j = 0; j < N_TOTAL_TOKEN; j++) {
-                    scores[i * N_TOTAL_TOKEN + j] = expf(scores[i * N_TOTAL_TOKEN + j] - p_max_val[i]);
-                    p_sum_exp[i] += scores[i * N_TOTAL_TOKEN + j];
-                }
-            }
-            
-
-
-
-
-
-            /* =========================================================================== */
-
-            {
-                cl_kernel k = container.kernels[__normalize_score];
-
-                // set kenrl args
-                // __kernel void normalize_score (
-                //     __global float* g_scores,
-                //     __global float* g_sum_exp
-                // ) {
-                KernelArg args[] = {
-                    { .size = sizeof(cl_mem), .addr = &m_scores },
-                    { .size = sizeof(cl_mem), .addr = &m_sum_exp },
-                };
-
-                for (int i=0; i<2; ++i) {
-                    err = clSetKernelArg(k, i, args[i].size, args[i].addr);
-                    CHECK_CL_ERROR(err);
+                for (int d = 0; d < head_dim; d++) {
+                    float q = Q[i * EMBED_DIM + head_offset + d];
+                    float k = K[j * EMBED_DIM + head_offset + d];
+                    score += q * k;
                 }
 
-                // run kernel
-                const size_t dim_config[] = { N_TOTAL_TOKEN, N_TOTAL_TOKEN };
-                err = clEnqueueNDRangeKernel(container.queue, k, 2, NULL, dim_config, NULL, 0, NULL, NULL);
-                CHECK_CL_ERROR(err);
+                scores[i * n_tokens + j] = score / sqrtf((float)head_dim);
             }
-
-            
-            // read result
-            err = clEnqueueReadBuffer(container.queue, m_scores, CL_TRUE, 0, scores_size, scores, 0, NULL, NULL);
-            CHECK_CL_ERROR(err);
         }
 
-
-        
-
-        // calculate result
+        // v_Softmax scores
         {
-            cl_kernel k = container.kernels[__cal_result];
+            size_t data_size = n_tokens * n_tokens * sizeof(float);
 
-            // set kernel args
-            // __kernel void cal_result(
-            // 	__global float* g_scores,
-            // 	__global float* g_V,
-            // 	__global float* g_attn_output,
-            // 	int EMBED_DIM,
-            // 	int head_offset
-            // ) {
-            int embed_dim = EMBED_DIM;
-            KernelArg args[] = {
-                { .size = sizeof(cl_mem), .addr = &m_scores },
-                { .size = sizeof(cl_mem), .addr = &m_v_output },
-                { .size = sizeof(cl_mem), .addr = &m_attn_output },
-                { .size = sizeof(int), .addr = &embed_dim },
-                { .size = sizeof(int), .addr = &head_offset },
-            };
+            cl_mem m_scores = clCreateBuffer(container.context, CL_MEM_READ_WRITE, data_size, NULL, &err);
+            clEnqueueWriteBuffer(container.queue, m_scores, CL_TRUE, 0, data_size, scores, 0, NULL, NULL);
 
-            for (int i=0; i<5; ++i) {
-                err = clSetKernelArg(k, i, args[i].size, args[i].addr);
-                CHECK_CL_ERROR(err);
-            }
+            cl_kernel k = container.kernels[__softmax_score];
+            int cols = n_tokens; 
+            size_t local_mem_size = 256 * sizeof(float);
 
-            // run kernel
-            const size_t dim_config[] = { N_TOTAL_TOKEN, HEAD_DIM };
-            err = clEnqueueNDRangeKernel(container.queue, k, 2, NULL, dim_config, NULL, 0, NULL, NULL);
-            CHECK_CL_ERROR(err);
+            int arg_idx = 0;
+            clSetKernelArg(k, arg_idx++, sizeof(cl_mem), &m_scores);
+            clSetKernelArg(k, arg_idx++, sizeof(int), &cols);
+            clSetKernelArg(k, arg_idx++, local_mem_size, NULL);
+            size_t local_work_size[] = { 256 };
+            size_t global_work_size[] = { (size_t)n_tokens * 256 };
+
+            clEnqueueNDRangeKernel(container.queue, k, 1, NULL, global_work_size, local_work_size, 0, NULL, NULL);
+
+            clEnqueueReadBuffer(container.queue, m_scores, CL_TRUE, 0, data_size, scores, 0, NULL, NULL);
+
+            clReleaseMemObject(m_scores);
         }
 
-        // read result -> 이거 위험할지도? 여기서 계산안되는 것들도 누적해야 하는데
-        err = clEnqueueReadBuffer(container.queue, m_attn_output, CL_TRUE, 0, attn_output_size, attn_output, 0, NULL, NULL);
-        CHECK_CL_ERROR(err);
-
-
-
-        // release?
-
-
-
+        // 3. Output Calculation (CPU)
+        for (int i = 0; i < n_tokens; i++) {
+            for (int d = 0; d < head_dim; d++) {
+                float sum = 0.0f;
+                for (int j = 0; j < n_tokens; j++) {
+                    sum += scores[i * n_tokens + j] * V[j * EMBED_DIM + head_offset + d];
+                }
+                head_out[i * head_dim + d] = sum;
+            }
+        }
+        for (int i = 0; i < n_tokens; i++) {
+            for (int d = 0; d < head_dim; d++) attn_output[i * EMBED_DIM + head_offset + d] = head_out[i * head_dim + d];
+        }
     }
-    
 
-    
-    // convert attn_output into output space
-    // TODO: convert below using v_lyneaer_
-    for (int t = 0; t < N_TOTAL_TOKEN; t++) {
+    for (int t = 0; t < n_tokens; t++) {
         for (int i = 0; i < EMBED_DIM; i++) {
             float sum = out_bias.data[i];
-            for (int j = 0; j < EMBED_DIM; j++) {
-                sum += attn_output[t * EMBED_DIM + j] * out_weight.data[i * EMBED_DIM + j];
-            }
-
+            for (int j = 0; j < EMBED_DIM; j++) sum += attn_output[t * EMBED_DIM + j] * out_weight.data[i * EMBED_DIM + j];
             output[t * EMBED_DIM + i] = sum;
         }
     }
 
-    // wrap up
-    err = clReleaseMemObject(m_input);
-    CHECK_CL_ERROR(err);
-    err = clReleaseMemObject(m_q_weight);
-    CHECK_CL_ERROR(err);
-    err = clReleaseMemObject(m_q_bias);
-    CHECK_CL_ERROR(err);
-    err = clReleaseMemObject(m_q_output);
-    CHECK_CL_ERROR(err);
-    err = clReleaseMemObject(m_k_weight);
-    CHECK_CL_ERROR(err);
-    err = clReleaseMemObject(m_k_bias);
-    CHECK_CL_ERROR(err);
-    err = clReleaseMemObject(m_k_output);
-    CHECK_CL_ERROR(err);
-    err = clReleaseMemObject(m_v_weight);
-    CHECK_CL_ERROR(err);
-    err = clReleaseMemObject(m_v_bias);
-    CHECK_CL_ERROR(err);
-    err = clReleaseMemObject(m_v_output);
-    CHECK_CL_ERROR(err);
-    err = clReleaseMemObject(m_scores);
-    CHECK_CL_ERROR(err);
-    err = clReleaseMemObject(m_max_val);
-    CHECK_CL_ERROR(err);
-    err = clReleaseMemObject(m_attn_output);
-    CHECK_CL_ERROR(err);
+    free(scores); free(head_out); free(attn_output); free(Q); free(K); free(V);
+}
 
 
-    free(attn_output);
-    free(scores);
-    free(Q);
-    free(K);
-    free(V);
+void hmm(cl_mem m_data, size_t n_data) {
+    cl_kernel k = container.kernels[__gelu];
+
+    // set kernel args
+    // __kernel void gelu(
+    //     __global float* g_data
+    // ) {
+    KernelArg args[] = {
+        {.size = sizeof(cl_mem), .addr = &m_data },
+    };
+
+    for (int i = 0; i < 1; ++i) {
+        err = clSetKernelArg(k, i, args[i].size, args[i].addr);
+        CHECK_CL_ERROR(err);
+    }
+
+    // run kerenl
+    size_t global_work_size[] = { n_data };
+    err = clEnqueueNDRangeKernel(
+        container.queue, k,
+        1, NULL, global_work_size, NULL,
+        0, NULL, NULL
+        );
+    CHECK_CL_ERROR(err);
 }
 
 
@@ -1087,7 +1031,7 @@ void v_Softmax(float* logits, float* probabilities, int length) {
     CHECK_CL_ERROR(err);
 
     //Host -> Device
-    err= clEnqueueWriteBuffer(container.queue, m_input, CL_TRUE, 0, data_size, logits, 0, NULL, NULL);
+    err = clEnqueueWriteBuffer(container.queue, m_input, CL_TRUE, 0, data_size, logits, 0, NULL, NULL);
     CHECK_CL_ERROR(err);
 
     // 커널 인자 설정
@@ -1104,7 +1048,7 @@ void v_Softmax(float* logits, float* probabilities, int length) {
     CHECK_CL_ERROR(err);
     err = clSetKernelArg(k, arg_idx++, sizeof(int), &n_data);
     CHECK_CL_ERROR(err);
-    err = clSetKernelArg(k, arg_idx++, local_mem_size, NULL); 
+    err = clSetKernelArg(k, arg_idx++, local_mem_size, NULL);
     CHECK_CL_ERROR(err);
 
     // 데이터가 1000개 정도이므로 1개의 워크그룹(256 스레드)만 띄워서 처리
@@ -1124,6 +1068,7 @@ void v_Softmax(float* logits, float* probabilities, int length) {
     clReleaseMemObject(m_input);
     clReleaseMemObject(m_output);
 }
+
 
 
 
@@ -1282,8 +1227,8 @@ void v_reduce_sum(
         const size_t local_work_size = work_group_size;
         err = clEnqueueNDRangeKernel(
             container.queue, container.kernels[__reduce_sum],
-            1, NULL, &global_work_size, NULL,
-            0, NULL, NULL);//local work size NULL로 설정
+            1, NULL, &global_work_size, &local_work_size,
+            0, NULL, NULL);
         CHECK_CL_ERROR(err);
 
         // swap input and output buffers
@@ -1549,5 +1494,4 @@ void matrix_plus(
 //     );
 //     CHECK_CL_ERROR(err);
 // }
-
 
