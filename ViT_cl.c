@@ -600,9 +600,17 @@ void v_multihead_attn(
     const int K_dim = EMBED_DIM;
     const int V_dim = EMBED_DIM * 2;
 
+    // allocate host memory objs
     float* Q = (float*)malloc(sizeof(float) * N_TOTAL_TOKEN * EMBED_DIM);
     float* K = (float*)malloc(sizeof(float) * N_TOTAL_TOKEN * EMBED_DIM);
     float* V = (float*)malloc(sizeof(float) * N_TOTAL_TOKEN * EMBED_DIM);
+    // scores[tokens][tokens]
+    float* scores = (float*)malloc(sizeof(float) * N_TOTAL_TOKEN * N_TOTAL_TOKEN);
+    // attn_output[N_TOTAL_TOKEN][EMBED_DIM]
+    float* attn_output = (float*)malloc(sizeof(float) * N_TOTAL_TOKEN * EMBED_DIM);
+
+
+
 
     // create and write memory obj
     const size_t input_size = N_TOTAL_TOKEN * EMBED_DIM * sizeof(float);
@@ -658,6 +666,40 @@ void v_multihead_attn(
     const size_t attn_output_size = N_TOTAL_TOKEN * EMBED_DIM * sizeof(float);
     cl_mem m_attn_output = clCreateBuffer(container.context, CL_MEM_READ_WRITE, attn_output_size, NULL, &err);
     CHECK_CL_ERROR(err);
+    
+    const size_t attn_output_size = N_TOTAL_TOKEN * EMBED_DIM * sizeof(float);
+    cl_mem m_attn_output = clCreateBuffer(container.context, CL_MEM_READ_WRITE, attn_output_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+
+    const size_t in_bias_size = in_bias.size * sizeof(float);
+    const size_t m_in_bias = clCreateBuffer(container.context, CL_MEM_READ_WRITE, in_bias_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+    err = clEnqueueWriteBuffer(container.queue, m_in_bias, CL_TRUE, 0, in_bias_size, in_bias.data, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+    
+    const size_t in_weight_size = in_weight.size * sizeof(float);
+    const size_t m_in_weight = clCreateBuffer(container.context, CL_MEM_READ_WRITE, in_weight_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+    err = clEnqueueWriteBuffer(container.queue, m_in_weight, CL_TRUE, 0, in_weight_size, in_weight.data, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+
+    const size_t out_bias_size = out_bias.size * sizeof(float);
+    const size_t m_out_bias = clCreateBuffer(container.context, CL_MEM_READ_WRITE, out_bias_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+    err = clEnqueueWriteBuffer(container.queue, m_out_bias, CL_TRUE, 0, out_bias_size, out_bias.data, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+    
+    const size_t out_weight_size = out_weight.size * sizeof(float);
+    const size_t m_out_weight = clCreateBuffer(container.context, CL_MEM_READ_WRITE, out_weight_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+    err = clEnqueueWriteBuffer(container.queue, m_out_weight, CL_TRUE, 0, out_weight_size, out_weight.data, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+    
+    const size_t output_size = N_TOTAL_TOKEN * EMBED_DIM * sizeof(float);
+    const size_t m_final_output = clCreateBuffer(container.context, CL_MEM_READ_WRITE, output_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+
+    
 
 
 
@@ -666,21 +708,6 @@ void v_multihead_attn(
     v_linear_layer(m_input, m_k_weight, m_k_bias, m_k_output, N_TOTAL_TOKEN, EMBED_DIM, EMBED_DIM, 0, NULL, NULL);
     v_linear_layer(m_input, m_v_weight, m_v_bias, m_v_output, N_TOTAL_TOKEN, EMBED_DIM, EMBED_DIM, 0, NULL, NULL);
 
-
-    // read value -> 나중에 지워야 함
-    err = clEnqueueReadBuffer(container.queue, m_v_output, CL_TRUE, 0, output_size, V, 0, NULL, NULL);
-    CHECK_CL_ERROR(err);
-
-
-
-
-
-
-    
-    // scores[tokens][tokens]
-    float* scores = (float*)malloc(sizeof(float) * N_TOTAL_TOKEN * N_TOTAL_TOKEN);
-    // attn_output[N_TOTAL_TOKEN][EMBED_DIM]
-    float* attn_output = (float*)malloc(sizeof(float) * N_TOTAL_TOKEN * EMBED_DIM);
 
 
     // calculate multi-head self attention
@@ -738,130 +765,20 @@ void v_multihead_attn(
 
 
 
-        // normalize scores
+        // softmax scores
         {
-            // get max value of 1 score row
-            // TODO: 커널로 돌리려면 머리좀 아프겠는데;; -> 리듕싱 어떻게 잘
-            float* p_max_val = (float*)calloc(N_TOTAL_TOKEN, sizeof(float));
-            for (int i = 0; i < N_TOTAL_TOKEN; i++) {
-                p_max_val[i] = FLT_MIN;
-            }
-            for (int i = 0; i < N_TOTAL_TOKEN; i++) {
-                for (int j = 1; j < N_TOTAL_TOKEN; j++) {
-                    if (scores[i * N_TOTAL_TOKEN + j] > p_max_val[i]) {
-                        p_max_val[i] = scores[i * N_TOTAL_TOKEN + j];
-                    }
-                }
-            }
+            
 
 
-            /* =========================================================================== */
 
-            err = clEnqueueWriteBuffer(container.queue, m_max_val, CL_TRUE, 0, max_val_size, p_max_val, 0, NULL, NULL);
-            CHECK_CL_ERROR(err);
-
-            {
-                cl_kernel k = container.kernels[__convert_score];
-
-                // set kernel args
-                // __kernel void convert_score (
-                //     __global float* g_scores,
-                //     __global float* g_max_val
-                // ) {
-                KernelArg args[] = {
-                    { .size = sizeof(cl_mem), .addr = &m_scores },
-                    { .size = sizeof(cl_mem), .addr = &m_max_val },
-                };
-
-                for (int i=0; i<2; ++i) {
-                    err = clSetKernelArg(k, i, args[i].size, args[i].addr);
-                    CHECK_CL_ERROR(err);
-                }
-
-                // run kernel
-                const size_t dim_config[] = { N_TOTAL_TOKEN, N_TOTAL_TOKEN };
-                err = clEnqueueNDRangeKernel(container.queue, k, 2, NULL, dim_config, NULL, 0, NULL, NULL);
-                CHECK_CL_ERROR(err);
-            }
-
-    int head_dim = EMBED_DIM / NUM_HEADS;
-    float* scores = (float*)malloc(sizeof(float) * N_TOTAL_TOKEN * N_TOTAL_TOKEN);
-    float* head_out = (float*)malloc(sizeof(float) * N_TOTAL_TOKEN * head_dim);
-    float* attn_output = (float*)malloc(sizeof(float) * N_TOTAL_TOKEN * EMBED_DIM);
-
-    for (int h = 0; h < NUM_HEADS; h++) {
-        int head_offset = h * head_dim;
-
-        float* scores = (float*)malloc(sizeof(float) * N_TOTAL_TOKEN * N_TOTAL_TOKEN);
-
-        for (int i = 0; i < N_TOTAL_TOKEN; i++) {
-            for (int j = 0; j < N_TOTAL_TOKEN; j++) {
-                float score = 0.0f;
-
-                for (int d = 0; d < head_dim; d++) {
-                    float q = Q[i * EMBED_DIM + head_offset + d];
-                    float k = K[j * EMBED_DIM + head_offset + d];
-                    score += q * k;
-                }
-
-                scores[i * N_TOTAL_TOKEN + j] = score / sqrtf((float)head_dim);
-            }
         }
 
-        // v_Softmax scores
+
+        
+
+        // calculate result
         {
-            size_t data_size = N_TOTAL_TOKEN * N_TOTAL_TOKEN * sizeof(float);
-
-            cl_mem m_scores = clCreateBuffer(container.context, CL_MEM_READ_WRITE, data_size, NULL, &err);
-            clEnqueueWriteBuffer(container.queue, m_scores, CL_TRUE, 0, data_size, scores, 0, NULL, NULL);
-
-            cl_kernel k = container.kernels[__softmax_score];
-            int cols = N_TOTAL_TOKEN; 
-            size_t local_mem_size = 256 * sizeof(float);
-
-            int arg_idx = 0;
-            clSetKernelArg(k, arg_idx++, sizeof(cl_mem), &m_scores);
-            clSetKernelArg(k, arg_idx++, sizeof(int), &cols);
-            clSetKernelArg(k, arg_idx++, local_mem_size, NULL);
-            size_t local_work_size[] = { 256 };
-            size_t global_work_size[] = { (size_t)N_TOTAL_TOKEN * 256 };
-
-            clEnqueueNDRangeKernel(container.queue, k, 1, NULL, global_work_size, local_work_size, 0, NULL, NULL);
-
-            clEnqueueReadBuffer(container.queue, m_scores, CL_TRUE, 0, data_size, scores, 0, NULL, NULL);
-
-            clReleaseMemObject(m_scores);
-        }
-
-        // 3. Output Calculation (CPU)
-        for (int i = 0; i < N_TOTAL_TOKEN; i++) {
-            for (int d = 0; d < head_dim; d++) {
-                float sum = 0.0f;
-                for (int j = 0; j < N_TOTAL_TOKEN; j++) {
-                    sum += scores[i * N_TOTAL_TOKEN + j] * V[j * EMBED_DIM + head_offset + d];
-                }
-                head_out[i * head_dim + d] = sum;
-            }
-        }
-        for (int i = 0; i < N_TOTAL_TOKEN; i++) {
-            for (int d = 0; d < head_dim; d++) attn_output[i * EMBED_DIM + head_offset + d] = head_out[i * head_dim + d];
-        }
-    }
-
-    for (int t = 0; t < N_TOTAL_TOKEN; t++) {
-        for (int i = 0; i < EMBED_DIM; i++) {
-            float sum = out_bias.data[i];
-            for (int j = 0; j < EMBED_DIM; j++) sum += attn_output[t * EMBED_DIM + j] * out_weight.data[i * EMBED_DIM + j];
-            output[t * EMBED_DIM + i] = sum;
-        }
-    }
-
-    free(scores); free(head_out); free(attn_output); free(Q); free(K); free(V);
-}
-
-
-void hmm(cl_mem m_data, size_t n_data) {
-    cl_kernel k = container.kernels[__gelu];
+            cl_kernel k = container.kernels[__cal_result];
 
     // set kernel args
     // __kernel void gelu(
@@ -1077,6 +994,7 @@ void v_Softmax(float* logits, float* probabilities, int length) {
 
 // normalize
 // input[total_num_patches + 1][EMBED_DIM] => output[total_num_patches + 1][EMBED_DIM]
+// TODO: cl_mem 받는 함수로
 void v_layer_norm(
     float* input, float* output,
     Network weight, Network bias
@@ -1355,7 +1273,7 @@ void v_normalize(
 // do linear transform with input matrix(network)
 void v_linear_layer(
     cl_mem m_input, cl_mem m_weight, cl_mem m_bias, cl_mem m_output,
-    int tokens, int in_features, int out_features,
+    int input_row, int input_col, int output_col,
     cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
     ) {
     const cl_kernel k = container.kernels[__linear];
@@ -1366,18 +1284,18 @@ void v_linear_layer(
     // 	__global const float* g_weight,
     // 	__global const float* g_bias,
     // 	__global float* g_output,
-    // 	const int tokens,           // M
-    // 	const int in_features,      // N
-    // 	const int out_features      // K
+    // 	const int input_row,           // M
+    // 	const int input_col,      // N
+    // 	const int output_col      // K
     // ) {
     KernelArg args[] = {
         {.size = sizeof(cl_mem), .addr = &m_input },
         {.size = sizeof(cl_mem), .addr = &m_weight },
         {.size = sizeof(cl_mem), .addr = &m_bias },
         {.size = sizeof(cl_mem), .addr = &m_output },
-        {.size = sizeof(int), .addr = &tokens },
-        {.size = sizeof(int), .addr = &in_features },
-        {.size = sizeof(int), .addr = &out_features },
+        {.size = sizeof(int), .addr = &input_row },
+        {.size = sizeof(int), .addr = &input_col },
+        {.size = sizeof(int), .addr = &output_col },
     };
 
     for (int i = 0; i < 7; ++i) {
@@ -1386,7 +1304,7 @@ void v_linear_layer(
     }
 
     // run kernel
-    const size_t gloabal_work_size[] = { tokens, out_features };
+    const size_t gloabal_work_size[] = { input_row, output_col };
     err = clEnqueueNDRangeKernel(
         container.queue, k,
         2, NULL, gloabal_work_size, NULL,
@@ -1395,6 +1313,8 @@ void v_linear_layer(
     CHECK_CL_ERROR(err);
 }
 
+
+// TODO: cl_mem 으로
 void matrix_plus(
     float* input1, float* input2, float* output,
     size_t n_data

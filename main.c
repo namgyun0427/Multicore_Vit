@@ -88,13 +88,13 @@ int main() {
 
     int cmp = comparator();
     if (cmp == 0) {
-        printf("Comparator: 두 파일의 내용이 동일합니다.\n");
+        printf("Comparator: all same.\n");
     }
     else if (cmp > 0) {
-        printf("Comparator: 두 파일의 내용에 %d개의 차이가 있습니다\n", cmp);
+        printf("Comparator: %d diffs\n", cmp);
     }
     else { 
-        printf("Comparator: 파일 비교 도중 오류가 발생했습니다.\n");
+        printf("Comparator: ERROR.\n");
     }
     return 0;
 }

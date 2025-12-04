@@ -45,7 +45,7 @@ int comparator(void) {
     for (int line_number = 0; line_number < IMAGE_COUNT; ++line_number) {
         if (fgets(line_result, BUFFER_SIZE, fp_result) == NULL ||
             fgets(line_answer, BUFFER_SIZE, fp_answer) == NULL) {
-            fprintf(stderr, "Line %d: 파일의 줄 수가 충분하지 않습니다.\n", line_number);
+            fprintf(stderr, "Line %d: not enough lines.\n", line_number);
             errors++;
             break;
         }
@@ -58,7 +58,7 @@ int comparator(void) {
 
         if (parse_line(line_result, &label_r, &prob_r) != 2 ||
             parse_line(line_answer, &label_a, &prob_a) != 2) {
-            fprintf(stderr, "Line %d: 파싱 오류 발생\n", line_number);
+            fprintf(stderr, "Line %d: parsing error\n", line_number);
             errors++;
             continue;
         }
