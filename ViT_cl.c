@@ -531,11 +531,7 @@ void v_Encoder(
 
     /*Residual2*/
     // skip connection again
-    LOG("2nd Residual1",
-        for (int i = 0; i < n_tokens * EMBED_DIM; i++) {
-            output[i] = residual[i] + mlp_out[i];
-        }
-    )
+    LOG("2nd Residual1", matrix_plus(residual, mlp_out, output, n_tokens * EMBED_DIM));
 
     // wrap up
     free(input_normalized);
