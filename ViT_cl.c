@@ -1,23 +1,5 @@
 #include "ViT_cl.h"
 
-/*
-[잡생각]
-커널 이름 컨벤션 정해두면 좋을듯 => 일단 지금은 '__'로 시작하는 걸로 통일
-v_ 로 시작하게끔 함수이름 변경
-cl 메모리 객체 관련해서도 => 일단 지금은 "m_"으로 시작하는 경로 통일
-커널을 쓰는 함수에 대해서도 네이밍 컨벤션?
-
-
-커널 하나당 wrppaer 함수 같이 만들어서 시그너쳐를 이용해서 매개변수 정보를 제공하는 쪽이 좋은 듯
-
-work_group_size 최대 크기 가져오기?
-
-reducing 을 2차원으로??
-
-테스트 어떻게 하지...? 그냥 static 말고 깡 전역으로 conatiner 선언하고 extern 으로 받아서 써야하나
-
-*/
-
 // TODO: matrix_plus 함수 cl_mem 받도록
 // TODO: position embedding 함수 matrix_plus쓰는 편으로 변경
 // TODO: Network 담을 buffer init에서 생성 및 초기화
