@@ -511,15 +511,77 @@ void v_Encoder(
     float* input_normalized = (float*)malloc(buffer_size);
     LOG("input_normalized", v_layer_norm(input, input_normalized, ln1_w, ln1_b));
 
-    // multi-head self attention
+    /* ------------------------------------------------------------------------------------------- */
+    
+    // output host buffer
     float* attn_out = (float*)malloc(buffer_size);
-    LOG("multi-head self attention", v_multihead_attn(input_normalized, attn_out, attn_w, attn_b, attn_out_w, attn_out_b));
-
-    /*Residual1*/
-    // skip-connection
     float* residual = (float*)malloc(buffer_size);
-    LOG("1st Residual1", matrix_plus(input, attn_out, residual, n_tokens * EMBED_DIM));
 
+    // create and write mem obj
+    cl_mem m_input = clCreateBuffer(container.context, CL_MEM_READ_WRITE, buffer_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+    err = clEnqueueWriteBuffer(container.queue, m_input, CL_TRUE, 0, buffer_size, input, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+
+    cl_mem m_input_normalized = clCreateBuffer(container.context, CL_MEM_READ_WRITE, buffer_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+    err = clEnqueueWriteBuffer(container.queue, m_input_normalized, CL_TRUE, 0, buffer_size, input_normalized, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+    
+    cl_mem m_attn_out = clCreateBuffer(container.context, CL_MEM_READ_WRITE, buffer_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+    
+    cl_mem m_attn_in_weight = clCreateBuffer(container.context, CL_MEM_READ_WRITE, attn_w.size * sizeof(float), NULL, &err);
+    CHECK_CL_ERROR(err);
+    err = clEnqueueWriteBuffer(container.queue, m_attn_in_weight, CL_TRUE, 0, attn_w.size * sizeof(float), attn_w.data, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+    
+    cl_mem m_attn_in_bias = clCreateBuffer(container.context, CL_MEM_READ_WRITE, attn_b.size * sizeof(float), NULL, &err);
+    CHECK_CL_ERROR(err);
+    err = clEnqueueWriteBuffer(container.queue, m_attn_in_bias, CL_TRUE, 0, attn_b.size * sizeof(float), attn_b.data, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+
+    cl_mem m_attn_out_weight = clCreateBuffer(container.context, CL_MEM_READ_WRITE, attn_out_w.size * sizeof(float), NULL, &err);
+    CHECK_CL_ERROR(err);
+    err = clEnqueueWriteBuffer(container.queue, m_attn_out_weight, CL_TRUE, 0, attn_out_w.size * sizeof(float), attn_out_w.data, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+    
+    cl_mem m_attn_out_bias = clCreateBuffer(container.context, CL_MEM_READ_WRITE, attn_out_b.size * sizeof(float), NULL, &err);
+    CHECK_CL_ERROR(err);
+    err = clEnqueueWriteBuffer(container.queue, m_attn_out_bias, CL_TRUE, 0, attn_out_b.size * sizeof(float), attn_out_b.data, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+
+    cl_mem m_residual = clCreateBuffer(container.context, CL_MEM_READ_WRITE, buffer_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+
+    /* ------------------------------------------------------------------------------------------- */
+
+
+    // multi-head self attention
+    LOG(
+        "multi-head self attention", 
+        v_multihead_attn(m_input_normalized, m_attn_out, m_attn_in_weight, m_attn_in_bias, m_attn_out_weight, m_attn_out_bias, 0, NULL, NULL)
+    );
+
+    /* Residual1 */
+    // skip-connection
+    LOG(
+        "1st Residual1", 
+        v_matrix_plus(m_input, m_attn_out, m_residual, N_TOTAL_TOKEN * EMBED_DIM, 0, NULL, NULL)
+    );
+    
+
+
+    /* ------------------------------------------------------------------------------------------- */
+    // read result
+    err = clEnqueueReadBuffer(container.queue, m_residual, CL_TRUE, 0, buffer_size, residual, 0, NULL, NULL);
+
+ 
+
+
+    
+
+    /* ------------------------------------------------------------------------------------------- */
 
     // normalize again
     float* residual_normalized = (float*)malloc(buffer_size);
@@ -529,7 +591,7 @@ void v_Encoder(
     float* mlp_out = (float*)malloc(buffer_size);
     LOG("MLP", v_mlp_block(residual_normalized, mlp_out, mlp1_w, mlp1_b, mlp2_w, mlp2_b));
 
-    /*Residual2*/
+    /* Residual2 */
     // skip connection again
     LOG("2nd Residual1", matrix_plus(residual, mlp_out, output, n_tokens * EMBED_DIM));
 
@@ -539,6 +601,26 @@ void v_Encoder(
     free(residual);
     free(residual_normalized);
     free(mlp_out);
+
+
+    /* ------------------------------------------------------------------------------------------- */
+    // release
+    err = clReleaseMemObject(m_input);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_input_normalized);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_attn_out);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_attn_in_weight);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_attn_in_bias);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_attn_out_weight);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_attn_out_bias);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_residual);
+    CHECK_CL_ERROR(err);
 
     printf(">> [v_Encoder] ended\n");
 }
@@ -612,12 +694,6 @@ void v_Softmax(float* logits, float* probabilities, int length) {
 
 
 
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-// TODO: cl_mem 으로
 void matrix_plus(
     float* input1, float* input2, float* output,
     size_t n_data
@@ -676,3 +752,37 @@ void matrix_plus(
     CHECK_CL_ERROR(err);
 }
 
+void v_matrix_plus(
+    cl_mem m_input1, cl_mem m_input2, 
+    cl_mem m_output, 
+    size_t n_data,
+    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
+) {
+    cl_kernel k = container.kernels[__matrix_plus];
+
+    // set kernel args
+    // __kernel void matrix_plus (
+    //     __global float* g_A,
+    //     __global float* g_B,
+    //     __global float* g_C
+    // ) {
+    KernelArg args[] = {
+        {.size = sizeof(cl_mem), .addr = &m_input1 },
+        {.size = sizeof(cl_mem), .addr = &m_input2 },
+        {.size = sizeof(cl_mem), .addr = &m_output }
+    };
+
+    for (int i = 0; i < 3; ++i) {
+        err = clSetKernelArg(k, i, args[i].size, args[i].addr);
+        CHECK_CL_ERROR(err);
+    }
+
+    // run kernel
+    size_t dim_config[] = { n_data };
+    err = clEnqueueNDRangeKernel(
+        container.queue, k,
+        1, NULL, dim_config, NULL,
+        e_num_waiting, e_waiting_arr, e_out
+    );
+    CHECK_CL_ERROR(err);
+}
