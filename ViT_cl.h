@@ -134,10 +134,17 @@ void v_pos_emb (
     Network pos_emb
 );
 
+// void v_Encoder(
+//     float* input, float* output,
+//     Network ln1_w, Network ln1_b, Network attn_w, Network attn_b, Network attn_out_w, Network attn_out_b,
+//     Network ln2_w, Network ln2_b, Network mlp1_w, Network mlp1_b, Network mlp2_w, Network mlp2_b
+// );
 void v_Encoder(
-    float* input, float* output,
-    Network ln1_w, Network ln1_b, Network attn_w, Network attn_b, Network attn_out_w, Network attn_out_b,
-    Network ln2_w, Network ln2_b, Network mlp1_w, Network mlp1_b, Network mlp2_w, Network mlp2_b
+    cl_mem m_input, cl_mem m_final_output,
+    cl_mem m_ln1_weight, cl_mem m_ln1_bias,
+    cl_mem m_attn_in_weight, cl_mem m_attn_in_bias, cl_mem m_attn_out_weight, cl_mem m_attn_out_bias, 
+    cl_mem m_ln2_weight, cl_mem m_ln2_bias, 
+    cl_mem m_mlp1_weight, cl_mem m_mlp1_bias, cl_mem m_mlp2_weight, cl_mem m_mlp2_bias
 );
 
 void v_multihead_attn(
