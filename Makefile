@@ -19,7 +19,14 @@ IN_OBJ = \
 	v_multihead_attn.c \
 	v_layer_norm.c \
 	v_linear_layer.c \
-	v_mlp_block.c
+	v_mlp_block.c \
+	v_Encoder.c \
+	v_Conv2d.c \
+	v_Softmax.c \
+	v_matrix_plus.c \
+	v_flatten_transpose.c \
+	v_pos_emb.c \
+	v_class_token.c
 
 OUT_OBJ = $(patsubst %.c,$(OUT_DIR_OBJ)/%.o,$(IN_OBJ))
 
