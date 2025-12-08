@@ -117,41 +117,24 @@ char* v_get_source_code(const char* file_name, size_t* len);
 
 void v_build_error(cl_program program, cl_device_id device, cl_int err);
 
-// void v_Conv2d (
-//     float* input, float* output, 
-//     Network weight, Network bias
-// );
+
 void v_Conv2d(
     cl_mem m_input, cl_mem m_output,
     cl_mem m_weight, cl_mem m_bias
 );
 
-// void v_flatten_transpose (float* input, float* output);
 void v_flatten_transpose(cl_mem m_input, cl_mem m_output);
 
-// void v_class_token (
-//     float* patch_tokens, float* final_tokens, 
-//     Network cls_tk
-// );
 void v_class_token(
     cl_mem m_input, cl_mem m_output,
     cl_mem m_class_token
 );
 
-// void v_pos_emb (
-//     float* input, float* output, 
-//     Network pos_emb
-// );
 void v_pos_emb(
     cl_mem m_input, cl_mem m_output,
     cl_mem m_pos_emb
 );
 
-// void v_Encoder(
-//     float* input, float* output,
-//     Network ln1_w, Network ln1_b, Network attn_w, Network attn_b, Network attn_out_w, Network attn_out_b,
-//     Network ln2_w, Network ln2_b, Network mlp1_w, Network mlp1_b, Network mlp2_w, Network mlp2_b
-// );
 void v_Encoder(
     cl_mem m_input, cl_mem m_final_output,
     cl_mem m_ln1_weight, cl_mem m_ln1_bias,
@@ -181,7 +164,6 @@ void v_layer_norm(
     cl_mem m_input, cl_mem m_output,
     cl_mem m_weight, cl_mem m_bias
 );
-
 
 void v_matrix_plus(
     cl_mem m_input1, cl_mem m_input2, 

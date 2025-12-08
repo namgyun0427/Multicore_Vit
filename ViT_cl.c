@@ -208,6 +208,8 @@ void ViT_cl(
 
     init(networks);
 
+    /* ------------------------------------------------------------------------------------ */
+    // host mem
     float* layer[4];
     for (int i = 0; i < 4; i++) {
         layer[i] = (float*)malloc(sizeof(float) * size[i]);
@@ -224,47 +226,61 @@ void ViT_cl(
     enc_output = (float*)malloc(sizeof(float) * ENC_SIZE);
 
 
+
+    /* ------------------------------------------------------------------------------------ */
+    // create and write input mem obj = image
+    const size_t img_size = IN_CAHNS * IMG_SIZE * IMG_SIZE * sizeof(float);
+    cl_mem m_img = clCreateBuffer(container.context, CL_MEM_READ_WRITE, img_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+    
+    // create output mem obj
+    const size_t patch_embedded_size = size[0] * sizeof(float);
+    cl_mem m_patch_embedded = clCreateBuffer(container.context, CL_MEM_READ_WRITE, patch_embedded_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+    
+    const size_t flatten_transposed_size = size[1] * sizeof(float);
+    cl_mem m_flatten_transposed = clCreateBuffer(container.context, CL_MEM_READ_WRITE, flatten_transposed_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+    
+    const size_t class_token_prepended_size = size[2] * sizeof(float);
+    cl_mem m_class_token_prepended = clCreateBuffer(container.context, CL_MEM_READ_WRITE, class_token_prepended_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+
+    const size_t position_embeded_size = size[3] * sizeof(float);
+    cl_mem m_position_embeded = clCreateBuffer(container.context, CL_MEM_READ_WRITE, position_embeded_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+
+    const size_t enc_output_size = ENC_SIZE * sizeof(float);
+    cl_mem m_enc_output_arr[12];
+    for (int i=0; i<12; ++i) {
+        m_enc_output_arr[i] = clCreateBuffer(container.context, CL_MEM_READ_WRITE, enc_output_size, NULL, &err);
+        CHECK_CL_ERROR(err);
+    }
+
+    const size_t normalized_size = N_TOTAL_TOKEN * EMBED_DIM * sizeof(float);
+    cl_mem m_normalized = clCreateBuffer(container.context, CL_MEM_READ_WRITE, normalized_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+
+    const size_t class_token_size = EMBED_DIM * sizeof(float);
+    cl_mem m_class_token = clCreateBuffer(container.context, CL_MEM_READ_WRITE, class_token_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+    
+    const size_t class_output_size = NUM_CLASSES * sizeof(float);
+    cl_mem m_class_output = clCreateBuffer(container.context, CL_MEM_READ_WRITE, class_output_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+
+
+
+    /* ------------------------------------------------------------------------------------ */
     // process per image
     for (int i = 0; i < image->n; i++) {
         printf("============= processing %d-th iamge =============\n", i);
 
-        // create and write input mem obj = image
-        const size_t img_size = image[i].c * image[i].h * image[i].w * sizeof(float);
-        cl_mem m_img = clCreateBuffer(container.context, CL_MEM_READ_WRITE, img_size, NULL, &err);
-        CHECK_CL_ERROR(err);
+        /* ------------------------------------------------------------------------------------ */
+        // write image obj
         err = clEnqueueWriteBuffer(container.queue, m_img, CL_TRUE, 0, img_size, image[i].data, 0, NULL, NULL);
         CHECK_CL_ERROR(err);
-        
-        // create output mem obj
-        const size_t patch_embedded_size = size[0] * sizeof(float);
-        cl_mem m_patch_embedded = clCreateBuffer(container.context, CL_MEM_READ_WRITE, patch_embedded_size, NULL, &err);
-        CHECK_CL_ERROR(err);
-        
-        const size_t flatten_transposed_size = size[1] * sizeof(float);
-        cl_mem m_flatten_transposed = clCreateBuffer(container.context, CL_MEM_READ_WRITE, flatten_transposed_size, NULL, &err);
-        CHECK_CL_ERROR(err);
-        
-        const size_t class_token_prepended_size = size[2] * sizeof(float);
-        cl_mem m_class_token_prepended = clCreateBuffer(container.context, CL_MEM_READ_WRITE, class_token_prepended_size, NULL, &err);
-        CHECK_CL_ERROR(err);
 
-        const size_t position_embeded_size = size[3] * sizeof(float);
-        cl_mem m_position_embeded = clCreateBuffer(container.context, CL_MEM_READ_WRITE, position_embeded_size, NULL, &err);
-        CHECK_CL_ERROR(err);
-
-        const size_t enc_output_size = ENC_SIZE * sizeof(float);
-        cl_mem m_enc_output_arr[12];
-        for (int i=0; i<12; ++i) {
-            m_enc_output_arr[i] = clCreateBuffer(container.context, CL_MEM_READ_WRITE, enc_output_size, NULL, &err);
-            CHECK_CL_ERROR(err);
-        }
-
-        const size_t normalized_size = N_TOTAL_TOKEN * EMBED_DIM * sizeof(float);
-        cl_mem m_normalized = clCreateBuffer(container.context, CL_MEM_READ_WRITE, normalized_size, NULL, &err);
-        CHECK_CL_ERROR(err);
-
-
-        
 
         /* ------------------------------------------------------------------------------------ */
         /*patch embedding*/
@@ -369,110 +385,62 @@ void ViT_cl(
         // layer_norm
         LOG("normalize", v_layer_norm(m_enc_output_arr[11], m_normalized, container.m_networks[148], container.m_networks[149]));
 
-
-
-
-        /* ------------------------------------------------------------------------------------ */
-        // read result
-        err = clEnqueueReadBuffer(container.queue, m_normalized, CL_TRUE, 0, normalized_size, enc_output, 0, NULL, NULL);
+        // load class token
+        err = clEnqueueCopyBuffer(container.queue, m_normalized, m_class_token, 0, 0, class_token_size, 0, NULL, NULL);
         CHECK_CL_ERROR(err);
 
-        
-
-
-
-
-
-
-        /* ------------------------------------------------------------------------------------ */
-
-        // load class token
-        float* cls_token = (float*)malloc(sizeof(float) * EMBED_DIM);
-        memcpy(cls_token, enc_output, sizeof(float) * EMBED_DIM);
-
-        // convert class token into output
-        float* cls_output = (float*)malloc(sizeof(float) * NUM_CLASSES);
-
-        LOG("cls_output", {
-            // create mem obj
-
-            // input = [tokens x in_features]
-            const size_t input_size = 1 * EMBED_DIM * sizeof(float);
-            cl_mem m_input = clCreateBuffer(container.context, CL_MEM_READ_WRITE, input_size, NULL, &err);
-            CHECK_CL_ERROR(err);
-
-            // weight = [out_features x in_features]
-            const size_t weight_size = NUM_CLASSES * EMBED_DIM * sizeof(float);
-            cl_mem m_weight = clCreateBuffer(container.context, CL_MEM_READ_WRITE, weight_size, NULL, &err);
-            CHECK_CL_ERROR(err);
-
-            // m_bias = [1 x out_features]
-            const size_t bias_size = NUM_CLASSES * sizeof(float);
-            cl_mem m_bias = clCreateBuffer(container.context, CL_MEM_READ_WRITE, bias_size, NULL, &err);
-            CHECK_CL_ERROR(err);
-
-            // output = [tokens x out_features]
-            const size_t output_size = 1 * NUM_CLASSES * sizeof(float);
-            cl_mem m_output = clCreateBuffer(container.context, CL_MEM_READ_WRITE, output_size, NULL, &err);
-            CHECK_CL_ERROR(err);
-
-            // write
-            err = clEnqueueWriteBuffer(container.queue, m_input, CL_TRUE, 0, input_size, cls_token, 0, NULL, NULL);
-            CHECK_CL_ERROR(err);
-            err = clEnqueueWriteBuffer(container.queue, m_weight, CL_TRUE, 0, weight_size, networks[150].data, 0, NULL, NULL);
-            CHECK_CL_ERROR(err);
-            err = clEnqueueWriteBuffer(container.queue, m_bias, CL_TRUE, 0, bias_size, networks[151].data, 0, NULL, NULL);
-            CHECK_CL_ERROR(err);
-
+        // convert class token into output (probabilites)
+        LOG(
+            "cls_output", 
             v_linear_layer(
-                m_input, m_weight, m_bias, m_output,
+                m_class_token, container.m_networks[150], container.m_networks[151], m_class_output,
                 1, EMBED_DIM, NUM_CLASSES,
                 0, NULL, NULL
             );
+        );
 
-            // read result
-            err = clEnqueueReadBuffer(container.queue, m_output, CL_TRUE, 0, output_size, cls_output, 0, NULL, NULL);
-            CHECK_CL_ERROR(err);
 
-            // release
-            err = clReleaseMemObject(m_input);
-            CHECK_CL_ERROR(err);
-            err = clReleaseMemObject(m_weight);
-            CHECK_CL_ERROR(err);
-            err = clReleaseMemObject(m_bias);
-            CHECK_CL_ERROR(err);
-            err = clReleaseMemObject(m_output);
-            CHECK_CL_ERROR(err);
-        });
+
+        
+
+        float* cls_output = (float*)malloc(sizeof(float) * NUM_CLASSES);
+
+        // read result
+        err = clEnqueueReadBuffer(container.queue, m_class_output, CL_TRUE, 0, class_output_size, cls_output, 0, NULL, NULL);
+        CHECK_CL_ERROR(err);
 
 
         // sofemax
         LOG("sofemax", v_Softmax(cls_output, probabilities[i], NUM_CLASSES));
-
-
-        /* ------------------------------------------------------------------------------------ */
-        // release mem objs
-        err = clReleaseMemObject(m_flatten_transposed);
-        CHECK_CL_ERROR(err);
-        err = clReleaseMemObject(m_class_token_prepended);
-        CHECK_CL_ERROR(err);
-        err = clReleaseMemObject(m_position_embeded);
-        CHECK_CL_ERROR(err);
-        for (int i=0; i<12; ++i) {
-            err = clReleaseMemObject(m_enc_output_arr[i]);
-            CHECK_CL_ERROR(err);
-        }
-        err = clReleaseMemObject(m_normalized);
-        CHECK_CL_ERROR(err);
-
         
         
         /* ------------------------------------------------------------------------------------ */
         // wrap up
-        free(cls_token);
         free(cls_output);
     }
 
+    /* ------------------------------------------------------------------------------------ */
+    // release mem objs
+    err = clReleaseMemObject(m_img);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_patch_embedded);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_flatten_transposed);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_class_token_prepended);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_position_embeded);
+    CHECK_CL_ERROR(err);
+    for (int i=0; i<12; ++i) {
+        err = clReleaseMemObject(m_enc_output_arr[i]);
+        CHECK_CL_ERROR(err);
+    }
+    err = clReleaseMemObject(m_normalized);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_class_token);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_class_output);
+    CHECK_CL_ERROR(err);
 
     // wrap up
     for (int i = 0; i < 4; i++) free(layer[i]);
