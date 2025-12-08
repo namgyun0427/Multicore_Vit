@@ -46,7 +46,7 @@ typedef struct CL_container{
     size_t n_kernels;
 
     Kernel_config* kernel_configs;
-    cl_kernel* kernels;     // TODO: 생각해보니 이거 malloc할 필요가 없는데?
+    cl_kernel* kernels;     // TODO: 생각해보니 이거 malloc할 필요가 없는데? -> 시간 남으면 바꾸자
     char** src_arr;
     size_t* len_arr;
 
@@ -158,7 +158,8 @@ void v_mlp_block(
 
 void v_gelu (cl_mem m_data, size_t n_data);
 
-void v_Softmax(float* logits, float* probabilities, int length);
+// void v_Softmax(float* logits, float* probabilities, int length);
+void v_Softmax(cl_mem m_input, cl_mem m_output, int length);
 
 void v_layer_norm(
     cl_mem m_input, cl_mem m_output,

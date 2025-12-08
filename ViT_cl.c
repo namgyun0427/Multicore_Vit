@@ -1,6 +1,5 @@
 #include "ViT_cl.h"
 
-// TODO: Network 담을 buffer init에서 생성 및 초기화
 
 ////////////////////////////////////////////////////////////////////////////////////
 // constants
@@ -203,28 +202,10 @@ void ViT_cl(
     ImageData* image,
     Network* networks,
     float** probabilities
-    ) {
+) {
     printf(">> [ViT_cl] : start\n");
 
     init(networks);
-
-    /* ------------------------------------------------------------------------------------ */
-    // host mem
-    float* layer[4];
-    for (int i = 0; i < 4; i++) {
-        layer[i] = (float*)malloc(sizeof(float) * size[i]);
-    }
-
-    // encoding layer
-    float* enc_layer[12];
-    for (int i = 0; i < 12; i++) {
-        enc_layer[i] = (float*)malloc(sizeof(float) * ENC_SIZE);
-    }
-
-    // encoding output
-    float* enc_output;
-    enc_output = (float*)malloc(sizeof(float) * ENC_SIZE);
-
 
 
     /* ------------------------------------------------------------------------------------ */
@@ -233,6 +214,7 @@ void ViT_cl(
     cl_mem m_img = clCreateBuffer(container.context, CL_MEM_READ_WRITE, img_size, NULL, &err);
     CHECK_CL_ERROR(err);
     
+    /* ------------------------------------------------------------------------------------ */
     // create output mem obj
     const size_t patch_embedded_size = size[0] * sizeof(float);
     cl_mem m_patch_embedded = clCreateBuffer(container.context, CL_MEM_READ_WRITE, patch_embedded_size, NULL, &err);
@@ -268,6 +250,12 @@ void ViT_cl(
     const size_t class_output_size = NUM_CLASSES * sizeof(float);
     cl_mem m_class_output = clCreateBuffer(container.context, CL_MEM_READ_WRITE, class_output_size, NULL, &err);
     CHECK_CL_ERROR(err);
+        
+    const size_t probabilities_size = NUM_CLASSES * sizeof(float);
+    cl_mem m_probabilities = clCreateBuffer(container.context, CL_MEM_READ_WRITE, probabilities_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+
+
 
 
 
@@ -399,25 +387,20 @@ void ViT_cl(
             );
         );
 
-
-
-        
-
-        float* cls_output = (float*)malloc(sizeof(float) * NUM_CLASSES);
-
-        // read result
-        err = clEnqueueReadBuffer(container.queue, m_class_output, CL_TRUE, 0, class_output_size, cls_output, 0, NULL, NULL);
-        CHECK_CL_ERROR(err);
-
-
         // sofemax
-        LOG("sofemax", v_Softmax(cls_output, probabilities[i], NUM_CLASSES));
+        LOG("sofemax", v_Softmax(m_class_output, m_probabilities, NUM_CLASSES));
         
-        
+
         /* ------------------------------------------------------------------------------------ */
-        // wrap up
-        free(cls_output);
+        // TODO: 한번만 read 하는 게 더 빠를 것 같음, 근데 그럼 softmax 바꿔야 함
+        // read result
+        err = clEnqueueReadBuffer(container.queue, m_probabilities, CL_TRUE, 0, probabilities_size, probabilities[i], 0, NULL, NULL);
+        CHECK_CL_ERROR(err);
     }
+
+
+
+
 
     /* ------------------------------------------------------------------------------------ */
     // release mem objs
@@ -441,11 +424,10 @@ void ViT_cl(
     CHECK_CL_ERROR(err);
     err = clReleaseMemObject(m_class_output);
     CHECK_CL_ERROR(err);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_probabilities);
+    CHECK_CL_ERROR(err);
 
-    // wrap up
-    for (int i = 0; i < 4; i++) free(layer[i]);
-    for (int i = 0; i < 12; i++) free(enc_layer[i]);
-    free(enc_output);
 
     cleanup();
 

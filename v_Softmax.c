@@ -1,22 +1,22 @@
 #include "ViT_cl.h"
 
 // Softmax 
-void v_Softmax(float* logits, float* probabilities, int length) {
+void v_Softmax(cl_mem m_input, cl_mem m_output, int length) {
     // 1. 메모리 객체 생성 ( logits -> probabilities )
     // logits은 입력, probabilities는 출력입니다.
     // logits, probabilities는 Host 메모리 포인터-> Device 버퍼를 만들어 사용
 
-    size_t data_size = length * sizeof(float);
+    // size_t data_size = length * sizeof(float);
 
-    cl_mem m_input = clCreateBuffer(container.context, CL_MEM_READ_ONLY, data_size, NULL, &err);
-    CHECK_CL_ERROR(err);
+    // cl_mem m_input = clCreateBuffer(container.context, CL_MEM_READ_ONLY, data_size, NULL, &err);
+    // CHECK_CL_ERROR(err);
 
-    cl_mem m_output = clCreateBuffer(container.context, CL_MEM_WRITE_ONLY, data_size, NULL, &err);
-    CHECK_CL_ERROR(err);
+    // cl_mem m_output = clCreateBuffer(container.context, CL_MEM_WRITE_ONLY, data_size, NULL, &err);
+    // CHECK_CL_ERROR(err);
 
-    //Host -> Device
-    err = clEnqueueWriteBuffer(container.queue, m_input, CL_TRUE, 0, data_size, logits, 0, NULL, NULL);
-    CHECK_CL_ERROR(err);
+    // //Host -> Device
+    // err = clEnqueueWriteBuffer(container.queue, m_input, CL_TRUE, 0, data_size, logits, 0, NULL, NULL);
+    // CHECK_CL_ERROR(err);
 
     // 커널 인자 설정
     // __kernel void softmax_kernel(in, out, N, local_cache)
@@ -47,10 +47,10 @@ void v_Softmax(float* logits, float* probabilities, int length) {
     CHECK_CL_ERROR(err);
 
     // 5. 결과 읽기 (Device -> Host)
-    err = clEnqueueReadBuffer(container.queue, m_output, CL_TRUE, 0, data_size, probabilities, 0, NULL, NULL);
-    CHECK_CL_ERROR(err);
+    // err = clEnqueueReadBuffer(container.queue, m_output, CL_TRUE, 0, data_size, probabilities, 0, NULL, NULL);
+    // CHECK_CL_ERROR(err);
 
-    // 6. 자원 해제
-    clReleaseMemObject(m_input);
-    clReleaseMemObject(m_output);
+    // // 6. 자원 해제
+    // clReleaseMemObject(m_input);
+    // clReleaseMemObject(m_output);
 }
