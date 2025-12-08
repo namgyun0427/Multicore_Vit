@@ -60,7 +60,7 @@ void v_mlp_block(
         m_input, m_weight1, m_bias1, m_mid, 
         N_TOTAL_TOKEN, EMBED_DIM, HIDDEN_DIM,
         0, NULL, NULL
-        );
+    );
 
     // gelu
     v_gelu(m_mid, mid_n_data);
@@ -70,7 +70,7 @@ void v_mlp_block(
         m_mid, m_weight2, m_bias2, m_output, 
         N_TOTAL_TOKEN, HIDDEN_DIM, EMBED_DIM,
         0, NULL, NULL
-        );
+    );
 
 
 

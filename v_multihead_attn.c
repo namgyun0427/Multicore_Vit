@@ -38,43 +38,31 @@ void v_multihead_attn(
     UNUSED(e_out);
 
     // create and write input memory obj
-    // const size_t input_size = N_TOTAL_TOKEN * EMBED_DIM * sizeof(float);
-    // cl_mem m_input = clCreateBuffer(container.context, CL_TRUE, input_size, NULL, &err);
-    // CHECK_CL_ERROR(err);
-    // err = clEnqueueWriteBuffer(container.queue, m_input, CL_TRUE, 0, input_size, input, 0, NULL, NULL);
-    // CHECK_CL_ERROR(err);
-
     const size_t weight_size = EMBED_DIM * EMBED_DIM * sizeof(float);
     cl_mem m_q_weight = clCreateBuffer(container.context, CL_MEM_READ_WRITE, weight_size, NULL, &err);
     CHECK_CL_ERROR(err);
-    // err = clEnqueueWriteBuffer(container.queue, m_q_weight, CL_TRUE, 0, weight_size, in_weight.data + Q_dim * EMBED_DIM, 0, NULL, NULL);
     err = clEnqueueCopyBuffer(container.queue, m_in_weight, m_q_weight, Q_dim * EMBED_DIM * sizeof(float), 0, weight_size, 0, NULL, NULL);
     CHECK_CL_ERROR(err);
     cl_mem m_k_weight = clCreateBuffer(container.context, CL_MEM_READ_WRITE, weight_size, NULL, &err);
     CHECK_CL_ERROR(err);
-    // err = clEnqueueWriteBuffer(container.queue, m_k_weight, CL_TRUE, 0, weight_size, in_weight.data + K_dim * EMBED_DIM, 0, NULL, NULL);
     err = clEnqueueCopyBuffer(container.queue, m_in_weight, m_k_weight, K_dim * EMBED_DIM * sizeof(float), 0, weight_size, 0, NULL, NULL);
     CHECK_CL_ERROR(err);
     cl_mem m_v_weight = clCreateBuffer(container.context, CL_MEM_READ_WRITE, weight_size, NULL, &err);
     CHECK_CL_ERROR(err);
-    // err = clEnqueueWriteBuffer(container.queue, m_v_weight, CL_TRUE, 0, weight_size, in_weight.data + V_dim * EMBED_DIM, 0, NULL, NULL);
     err = clEnqueueCopyBuffer(container.queue, m_in_weight, m_v_weight, V_dim * EMBED_DIM * sizeof(float), 0, weight_size, 0, NULL, NULL);
     CHECK_CL_ERROR(err);
 
     const size_t bias_size = 1 * EMBED_DIM * sizeof(float);
     cl_mem m_q_bias = clCreateBuffer(container.context, CL_MEM_READ_WRITE, bias_size, NULL, &err);
     CHECK_CL_ERROR(err);
-    // err = clEnqueueWriteBuffer(container.queue, m_q_bias, CL_TRUE, 0, bias_size, in_bias.data + Q_dim, 0, NULL, NULL);
     err = clEnqueueCopyBuffer(container.queue, m_in_bias, m_q_bias, Q_dim * sizeof(float), 0, bias_size, 0, NULL, NULL);
     CHECK_CL_ERROR(err);
     cl_mem m_k_bias = clCreateBuffer(container.context, CL_MEM_READ_WRITE, bias_size, NULL, &err);
     CHECK_CL_ERROR(err);
-    // err = clEnqueueWriteBuffer(container.queue, m_k_bias, CL_TRUE, 0, bias_size, in_bias.data + K_dim, 0, NULL, NULL);
     err = clEnqueueCopyBuffer(container.queue, m_in_bias, m_k_bias, K_dim * sizeof(float), 0, bias_size, 0, NULL, NULL);
     CHECK_CL_ERROR(err);
     cl_mem m_v_bias = clCreateBuffer(container.context, CL_MEM_READ_WRITE, bias_size, NULL, &err);
     CHECK_CL_ERROR(err);
-    // err = clEnqueueWriteBuffer(container.queue, m_v_bias, CL_TRUE, 0, bias_size, in_bias.data + V_dim, 0, NULL, NULL);
     err = clEnqueueCopyBuffer(container.queue, m_in_bias, m_v_bias, V_dim * sizeof(float), 0, bias_size, 0, NULL, NULL);
     CHECK_CL_ERROR(err);
 
@@ -95,21 +83,6 @@ void v_multihead_attn(
     cl_mem m_attn_output = clCreateBuffer(container.context, CL_MEM_READ_WRITE, attn_output_size, NULL, &err);
     CHECK_CL_ERROR(err);
 
-    // const size_t out_bias_size = out_bias.size * sizeof(float);
-    // cl_mem m_out_bias = clCreateBuffer(container.context, CL_TRUE, out_bias_size, NULL, &err);
-    // CHECK_CL_ERROR(err);
-    // err = clEnqueueWriteBuffer(container.queue, m_out_bias, CL_TRUE, 0, out_bias_size, out_bias.data, 0, NULL, NULL);
-    // CHECK_CL_ERROR(err);
-    
-    // const size_t out_weight_size = out_weight.size * sizeof(float);
-    // cl_mem m_out_weight = clCreateBuffer(container.context, CL_TRUE, out_weight_size, NULL, &err);
-    // CHECK_CL_ERROR(err);
-    // err = clEnqueueWriteBuffer(container.queue, m_out_weight, CL_TRUE, 0, out_weight_size, out_weight.data, 0, NULL, NULL);
-    // CHECK_CL_ERROR(err);
-    
-    // const size_t fianl_output_size = N_TOTAL_TOKEN * EMBED_DIM* sizeof(float);
-    // cl_mem m_fianl_output = clCreateBuffer(container.context, CL_TRUE, fianl_output_size, NULL, &err);
-    // CHECK_CL_ERROR(err);
 
 
 
@@ -136,10 +109,6 @@ void v_multihead_attn(
     // calcualte final output
     v_linear_layer(m_attn_output, m_out_weight, m_out_bias, m_fianl_output, N_TOTAL_TOKEN, EMBED_DIM, EMBED_DIM, 0, NULL, NULL);
 
-    // read result
-    // err = clEnqueueReadBuffer(container.queue, m_fianl_output, CL_TRUE, 0, fianl_output_size, output, 0, NULL, NULL);
-    // CHECK_CL_ERROR(err);
-
 
 
 
@@ -148,14 +117,6 @@ void v_multihead_attn(
     CHECK_CL_ERROR(err);
     err = clReleaseMemObject(m_attn_output);
     CHECK_CL_ERROR(err);
-    // err = clReleaseMemObject(m_out_bias);
-    // CHECK_CL_ERROR(err);
-    // err = clReleaseMemObject(m_out_weight);
-    // CHECK_CL_ERROR(err);
-    // err = clReleaseMemObject(m_fianl_output);
-    // CHECK_CL_ERROR(err);
-    // err = clReleaseMemObject(m_input);
-    // CHECK_CL_ERROR(err);
     err = clReleaseMemObject(m_q_weight);
     CHECK_CL_ERROR(err);
     err = clReleaseMemObject(m_k_weight);

@@ -29,18 +29,11 @@ cl_int err;
 
 
 Kernel_config kernel_configs[N_KERNEL] = {
-    {.kernel_name = "reduce_sum", .file_path = "./kernels/reduce_sum.cl" },
-    {.kernel_name = "load_square", .file_path = "./kernels/load_square.cl" },
-    {.kernel_name = "my_normalize", .file_path = "./kernels/normalize.cl" },
     {.kernel_name = "matrix_plus", .file_path = "./kernels/matrix_plus.cl" },
-    {.kernel_name = "cl_matrix_plus", .file_path = "./kernels/cl_matrix_plus.cl" },
     {.kernel_name = "linear", .file_path = "./kernels/linear.cl" },
-    {.kernel_name = "cal_mean_and_inv_std", .file_path = "./kernels/cal_mean_and_inv_std.cl" },
     {.kernel_name = "gelu", .file_path = "./kernels/gelu.cl" },
-    { .kernel_name = "cal_score", .file_path = "./kernels/multihead_attrention/cal_score.cl" },
-    { .kernel_name = "convert_score", .file_path = "./kernels/multihead_attrention/convert_score.cl" },
-    { .kernel_name = "normalize_score", .file_path = "./kernels/multihead_attrention/normalize_score.cl" },
-    { .kernel_name = "cal_result", .file_path = "./kernels/multihead_attrention/cal_result.cl" },
+    {.kernel_name = "cal_score", .file_path = "./kernels/multihead_attrention/cal_score.cl" },
+    {.kernel_name = "cal_result", .file_path = "./kernels/multihead_attrention/cal_result.cl" },
     {.kernel_name = "softmax_kernel", .file_path = "./kernels/softmax.cl" },
     {.kernel_name = "softmax_score_kernel", .file_path = "./kernels/softmax_score.cl" },
     {.kernel_name = "layer_norm", .file_path = "./kernels/layer_norm.cl" },

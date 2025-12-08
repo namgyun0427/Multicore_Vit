@@ -21,6 +21,7 @@ __kernel void layer_norm(
     barrier(CLK_LOCAL_MEM_FENCE);
 
     // cal plain_sum and sum_of_sqare with reducing
+    // EMBED_DIM = 786 이므로 3일 때까지 (매직넘버 쩔 수 없...)
     for (int offset=local_work_size / 2; offset >= 3; offset >>= 1) {
         if (lid < offset) {
             l_plain_sum[lid] += l_plain_sum[lid + offset];
@@ -44,25 +45,3 @@ __kernel void layer_norm(
     // normalize data
     g_output[gid] = ((origin_data - mean) * inv_std) * g_weight[lid] + g_bias[lid];
 }
-
-
-// for (int t = 0; t < token; t++) {
-//     // cal sum, sum_of_square per token
-//     float sum = 0.0, sum_of_square = 0.0;
-//     for (int i = 0; i < EMBED_DIM; i++) {
-//         float val = input[t * EMBED_DIM + i];
-//         sum += val;
-//         sum_of_square += val * val;
-//     }
-    
-//     // 순차적으로 평균, 분산, 표준편차의 역수 계산
-//     float mean = sum / EMBED_DIM;
-//     float var = sum_of_square / EMBED_DIM - mean * mean;
-//     float inv_std = 1.0f / sqrtf(var + EPSILON);
-
-//     // normalize values
-//     for (int i = 0; i < EMBED_DIM; i++) {
-//         int idx = t * EMBED_DIM + i;
-//         output[idx] = ((input[idx] - mean) * inv_std) * weight.data[i] + bias.data[i];
-//     }
-// }

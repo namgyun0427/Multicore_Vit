@@ -69,20 +69,13 @@ extern cl_int err;
 // Kernels_idxs와 kernel_configs의 순서가 맞아야 함
 // kernel_configs 를 순회해서 각 file_path 별로 소스 코드를 뽑아서 빌드함
 
-#define N_KERNEL 15
+#define N_KERNEL 8
 
 enum Kernels_idxs {
-    __reduce_sum = 0,
-    __load_square,
-    __normalize,
-    __matrix_plus,
-    __cl_matrix_plus,
+    __matrix_plus = 0,
     __linear,
-    __cal_mean_and_inv_std,
     __gelu,
     __cal_score,
-    __convert_score,
-    __normalize_score,
     __cal_result,
     __softmax,
     __softmax_score,
@@ -143,11 +136,6 @@ void v_Encoder(
     Network ln2_w, Network ln2_b, Network mlp1_w, Network mlp1_b, Network mlp2_w, Network mlp2_b
 );
 
-// void v_multihead_attn(
-//     float* input, float* output,
-//     Network in_weight, Network in_bias, 
-//     Network out_weight, Network out_bias
-// );
 void v_multihead_attn(
     cl_mem m_input, cl_mem m_fianl_output,
     cl_mem m_in_weight, cl_mem m_in_bias,
@@ -187,38 +175,6 @@ void v_linear_layer (
     int tokens, int in_features, int out_features,
     cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
 );
-
-void v_reduce_sum_of_square (
-    cl_mem m_data, 
-    cl_mem m_output, 
-    size_t total_num_data,
-    size_t work_group_size,
-    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
-);
-
-void v_reduce_sum (
-    cl_mem m_data, 
-    cl_mem m_output, 
-    size_t total_num_data,
-    size_t work_group_size,
-    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
-);
-
-void v_cal_mean_and_inv_std (
-    cl_mem m_sum, cl_mem m_sum_of_square,
-    cl_mem m_mean, cl_mem m_inv_std,
-    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
-);
-
-void v_normalize (
-    cl_mem m_input, 
-    cl_mem m_weight, cl_mem m_bias,
-    cl_mem m_mean, cl_mem m_inv_std,
-    int total_num_data,
-    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
-);
-
-
 
 
 #endif // _ViT_cl_H
