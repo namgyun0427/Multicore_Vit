@@ -153,9 +153,9 @@ void v_gelu (cl_mem m_data, size_t n_data);
 
 void v_Softmax(float* logits, float* probabilities, int length);
 
-void v_layer_norm (
-    float* input, float* output, 
-    Network weight, Network bias
+void v_layer_norm(
+    cl_mem m_input, cl_mem m_output,
+    cl_mem m_weight, cl_mem m_bias
 );
 
 void matrix_plus (

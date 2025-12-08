@@ -293,9 +293,52 @@ void ViT_cl(
         }
 
 
-        // normalize
-        LOG("normalize", v_layer_norm(enc_layer[11], enc_output, networks[148], networks[149]));
+        
 
+        /* ------------------------------------------------------------------------------------ */
+        // normalize
+
+        // create ans write mem obj
+        const size_t data_size = N_TOTAL_TOKEN * EMBED_DIM * sizeof(float);
+        cl_mem m_encoded = clCreateBuffer(container.context, CL_MEM_READ_WRITE, data_size, NULL, &err);
+        CHECK_CL_ERROR(err);
+        err = clEnqueueWriteBuffer(container.queue, m_encoded, CL_TRUE, 0, data_size, enc_layer[11], 0, NULL, NULL);
+        CHECK_CL_ERROR(err);
+        
+        const size_t weight_size = networks[148].size * sizeof(float);
+        cl_mem m_weight = clCreateBuffer(container.context, CL_MEM_READ_WRITE, weight_size, NULL, &err);
+        CHECK_CL_ERROR(err);
+        err = clEnqueueWriteBuffer(container.queue, m_weight, CL_TRUE, 0, weight_size, networks[148].data, 0, NULL, NULL);
+        CHECK_CL_ERROR(err);
+        
+        const size_t bias_size = networks[149].size * sizeof(float);
+        cl_mem m_bias = clCreateBuffer(container.context, CL_MEM_READ_WRITE, bias_size, NULL, &err);
+        CHECK_CL_ERROR(err);
+        err = clEnqueueWriteBuffer(container.queue, m_bias, CL_TRUE, 0, bias_size, networks[149].data, 0, NULL, NULL);
+        CHECK_CL_ERROR(err);
+
+        cl_mem m_normalized = clCreateBuffer(container.context, CL_MEM_READ_WRITE, data_size, NULL, &err);
+        CHECK_CL_ERROR(err);
+
+        // layer_norm
+        LOG("normalize", v_layer_norm(m_encoded, m_normalized, m_weight, m_bias));
+
+        // read result
+        err = clEnqueueReadBuffer(container.queue, m_normalized, CL_TRUE, 0, data_size, enc_output, 0, NULL, NULL);
+        CHECK_CL_ERROR(err);
+
+        // release
+        err = clReleaseMemObject(m_encoded);
+        CHECK_CL_ERROR(err);
+        err = clReleaseMemObject(m_weight);
+        CHECK_CL_ERROR(err);
+        err = clReleaseMemObject(m_bias);
+        CHECK_CL_ERROR(err);
+        err = clReleaseMemObject(m_normalized);
+        CHECK_CL_ERROR(err);
+
+
+        /* ------------------------------------------------------------------------------------ */
 
         // load class token
         float* cls_token = (float*)malloc(sizeof(float) * EMBED_DIM);
@@ -345,6 +388,7 @@ void ViT_cl(
             err = clEnqueueReadBuffer(container.queue, m_output, CL_TRUE, 0, output_size, cls_output, 0, NULL, NULL);
             CHECK_CL_ERROR(err);
 
+            // release
             err = clReleaseMemObject(m_input);
             CHECK_CL_ERROR(err);
             err = clReleaseMemObject(m_weight);
@@ -353,14 +397,18 @@ void ViT_cl(
             CHECK_CL_ERROR(err);
             err = clReleaseMemObject(m_output);
             CHECK_CL_ERROR(err);
-            });
+        });
 
 
         // sofemax
         LOG("sofemax", v_Softmax(cls_output, probabilities[i], NUM_CLASSES));
+
+        // wrap up
         free(cls_token);
         free(cls_output);
     }
+
+
     for (int i = 0; i < 4; i++) free(layer[i]);
     for (int i = 0; i < 12; i++) free(enc_layer[i]);
     free(enc_output);
@@ -500,30 +548,45 @@ void v_Encoder(
     int n_tokens = ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE)) + 1;
     size_t buffer_size = sizeof(float) * n_tokens * EMBED_DIM;
 
-    // normalize input
-    float* input_normalized = (float*)malloc(buffer_size);
-    LOG("input_normalized", v_layer_norm(input, input_normalized, ln1_w, ln1_b));
+    // output host buffer
+    float* residual = (float*)malloc(buffer_size);
+    float* residual_normalized = (float*)malloc(buffer_size);
+
+
+
+
 
     /* ------------------------------------------------------------------------------------------- */
-    
-    // output host buffer
-    float* attn_out = (float*)malloc(buffer_size);
-    float* residual = (float*)malloc(buffer_size);
-
-    // create and write mem obj
+    // create and write input mem obj
     cl_mem m_input = clCreateBuffer(container.context, CL_MEM_READ_WRITE, buffer_size, NULL, &err);
     CHECK_CL_ERROR(err);
     err = clEnqueueWriteBuffer(container.queue, m_input, CL_TRUE, 0, buffer_size, input, 0, NULL, NULL);
     CHECK_CL_ERROR(err);
+    
+    const size_t ln1_weight_size = ln1_w.size * sizeof(float);
+    cl_mem m_ln1_weight = clCreateBuffer(container.context, CL_MEM_READ_WRITE, ln1_weight_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+    err = clEnqueueWriteBuffer(container.queue, m_ln1_weight, CL_TRUE, 0, ln1_weight_size, ln1_w.data, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
 
-    cl_mem m_input_normalized = clCreateBuffer(container.context, CL_MEM_READ_WRITE, buffer_size, NULL, &err);
+    const size_t ln1_bias_size = ln1_b.size * sizeof(float);
+    cl_mem m_ln1_bias = clCreateBuffer(container.context, CL_MEM_READ_WRITE, ln1_bias_size, NULL, &err);
     CHECK_CL_ERROR(err);
-    err = clEnqueueWriteBuffer(container.queue, m_input_normalized, CL_TRUE, 0, buffer_size, input_normalized, 0, NULL, NULL);
-    CHECK_CL_ERROR(err);
-    
-    cl_mem m_attn_out = clCreateBuffer(container.context, CL_MEM_READ_WRITE, buffer_size, NULL, &err);
+    err = clEnqueueWriteBuffer(container.queue, m_ln1_bias, CL_TRUE, 0, ln1_bias_size, ln1_b.data, 0, NULL, NULL);
     CHECK_CL_ERROR(err);
     
+    const size_t ln2_weight_size = ln2_w.size * sizeof(float);
+    cl_mem m_ln2_weight = clCreateBuffer(container.context, CL_MEM_READ_WRITE, ln2_weight_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+    err = clEnqueueWriteBuffer(container.queue, m_ln2_weight, CL_TRUE, 0, ln2_weight_size, ln2_w.data, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+
+    const size_t ln2_bias_size = ln2_b.size * sizeof(float);
+    cl_mem m_ln2_bias = clCreateBuffer(container.context, CL_MEM_READ_WRITE, ln2_bias_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+    err = clEnqueueWriteBuffer(container.queue, m_ln2_bias, CL_TRUE, 0, ln2_bias_size, ln2_b.data, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+
     cl_mem m_attn_in_weight = clCreateBuffer(container.context, CL_MEM_READ_WRITE, attn_w.size * sizeof(float), NULL, &err);
     CHECK_CL_ERROR(err);
     err = clEnqueueWriteBuffer(container.queue, m_attn_in_weight, CL_TRUE, 0, attn_w.size * sizeof(float), attn_w.data, 0, NULL, NULL);
@@ -544,11 +607,25 @@ void v_Encoder(
     err = clEnqueueWriteBuffer(container.queue, m_attn_out_bias, CL_TRUE, 0, attn_out_b.size * sizeof(float), attn_out_b.data, 0, NULL, NULL);
     CHECK_CL_ERROR(err);
 
-    cl_mem m_residual = clCreateBuffer(container.context, CL_MEM_READ_WRITE, buffer_size, NULL, &err);
+    
+    // create output mem obj
+    cl_mem m_input_normalized = clCreateBuffer(container.context, CL_MEM_READ_WRITE, buffer_size, NULL, &err);
     CHECK_CL_ERROR(err);
 
-    /* ------------------------------------------------------------------------------------------- */
+    cl_mem m_attn_out = clCreateBuffer(container.context, CL_MEM_READ_WRITE, buffer_size, NULL, &err);
+    CHECK_CL_ERROR(err);
 
+    cl_mem m_residual = clCreateBuffer(container.context, CL_MEM_READ_WRITE, buffer_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+    
+    cl_mem m_residual_normalized = clCreateBuffer(container.context, CL_MEM_READ_WRITE, buffer_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+
+
+
+    /* ------------------------------------------------------------------------------------------- */
+    // normalize input
+    LOG("input_normalized", v_layer_norm(m_input, m_input_normalized, m_ln1_weight, m_ln1_bias));
 
     // multi-head self attention
     LOG(
@@ -562,23 +639,20 @@ void v_Encoder(
         "1st Residual1", 
         v_matrix_plus(m_input, m_attn_out, m_residual, N_TOTAL_TOKEN * EMBED_DIM, 0, NULL, NULL)
     );
+
+    // normalize again
+    LOG("residual_normalized", v_layer_norm(m_residual, m_residual_normalized, m_ln2_weight, m_ln2_bias));
     
-
-
+    
     /* ------------------------------------------------------------------------------------------- */
     // read result
     err = clEnqueueReadBuffer(container.queue, m_residual, CL_TRUE, 0, buffer_size, residual, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+    err = clEnqueueReadBuffer(container.queue, m_residual_normalized, CL_TRUE, 0, buffer_size, residual_normalized, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
 
- 
 
 
-    
-
-    /* ------------------------------------------------------------------------------------------- */
-
-    // normalize again
-    float* residual_normalized = (float*)malloc(buffer_size);
-    LOG("residual_normalized", v_layer_norm(residual, residual_normalized, ln2_w, ln2_b));
 
     /* MLP */
     float* mlp_out = (float*)malloc(buffer_size);
@@ -589,8 +663,6 @@ void v_Encoder(
     LOG("2nd Residual1", matrix_plus(residual, mlp_out, output, n_tokens * EMBED_DIM));
 
     // wrap up
-    free(input_normalized);
-    free(attn_out);
     free(residual);
     free(residual_normalized);
     free(mlp_out);
@@ -600,9 +672,9 @@ void v_Encoder(
     // release
     err = clReleaseMemObject(m_input);
     CHECK_CL_ERROR(err);
-    err = clReleaseMemObject(m_input_normalized);
+    err = clReleaseMemObject(m_ln1_weight);
     CHECK_CL_ERROR(err);
-    err = clReleaseMemObject(m_attn_out);
+    err = clReleaseMemObject(m_ln1_bias);
     CHECK_CL_ERROR(err);
     err = clReleaseMemObject(m_attn_in_weight);
     CHECK_CL_ERROR(err);
@@ -611,6 +683,10 @@ void v_Encoder(
     err = clReleaseMemObject(m_attn_out_weight);
     CHECK_CL_ERROR(err);
     err = clReleaseMemObject(m_attn_out_bias);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_input_normalized);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_attn_out);
     CHECK_CL_ERROR(err);
     err = clReleaseMemObject(m_residual);
     CHECK_CL_ERROR(err);
