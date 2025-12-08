@@ -17,6 +17,8 @@
     #define MLP_RATIO 4.0
     #define EPSILON 1e-6
 
+    #define NETWORK_NUM 152
+
 
     // comment this to process one img
     // #define SWITCH_100

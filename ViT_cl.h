@@ -46,9 +46,11 @@ typedef struct CL_container{
     size_t n_kernels;
 
     Kernel_config* kernel_configs;
-    cl_kernel* kernels;
+    cl_kernel* kernels;     // TODO: 생각해보니 이거 malloc할 필요가 없는데?
     char** src_arr;
     size_t* len_arr;
+
+    cl_mem m_networks[NETWORK_NUM];
 } CL_container;
 
 typedef struct KernelArg {

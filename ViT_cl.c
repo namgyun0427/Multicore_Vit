@@ -85,7 +85,7 @@ void v_build_error(cl_program program, cl_device_id device, cl_int err) {
     };
 }
 
-void init() {
+void init(Network* networks) {
     printf(">> [init] : start\n");
 
     // get platform
@@ -139,11 +139,27 @@ void init() {
     free(container.src_arr);
     free(container.len_arr);
 
+    // create network mem objs
+    for (int i=0; i<NETWORK_NUM; ++i) {
+        const size_t network_size = networks[i].size * sizeof(float);
+        container.m_networks[i] = clCreateBuffer(container.context, CL_MEM_READ_WRITE, network_size, NULL, &err);
+        CHECK_CL_ERROR(err);
+        err = clEnqueueWriteBuffer(container.queue, container.m_networks[i], CL_TRUE, 0, network_size, networks[i].data, 0, NULL, NULL);
+        CHECK_CL_ERROR(err);
+    }
+
+
     printf(">> [init] : ended\n");
 }
 
 void cleanup() {
     printf(">> [cleanup] : start\n");
+
+    // release newtork mem objs
+    for (int i=0; i<NETWORK_NUM; ++i) {
+        err = clReleaseMemObject(container.m_networks[i]);
+        CHECK_CL_ERROR(err);
+    }
 
     // release kernels
     for (size_t i = 0; i < container.n_kernels; ++i) {
@@ -190,7 +206,7 @@ void ViT_cl(
     ) {
     printf(">> [ViT_cl] : start\n");
 
-    init();
+    init(networks);
 
     float* layer[4];
     for (int i = 0; i < 4; i++) {
