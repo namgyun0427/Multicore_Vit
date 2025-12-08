@@ -1,6 +1,5 @@
 #include "ViT_cl.h"
 
-// TODO: matrix_plus 함수 cl_mem 받도록
 // TODO: position embedding 함수 matrix_plus쓰는 편으로 변경
 // TODO: Network 담을 buffer init에서 생성 및 초기화
 
@@ -44,6 +43,7 @@ Kernel_config kernel_configs[N_KERNEL] = {
     { .kernel_name = "cal_result", .file_path = "./kernels/multihead_attrention/cal_result.cl" },
     {.kernel_name = "softmax_kernel", .file_path = "./kernels/softmax.cl" },
     {.kernel_name = "softmax_score_kernel", .file_path = "./kernels/softmax_score.cl" },
+    {.kernel_name = "layer_norm", .file_path = "./kernels/layer_norm.cl" },
 };
 
 

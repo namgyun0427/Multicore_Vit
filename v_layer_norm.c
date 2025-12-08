@@ -7,60 +7,86 @@
 void v_layer_norm(
     float* input, float* output,
     Network weight, Network bias
-    ) {
-    const int token = N_TOTAL_TOKEN;
-    const int total_num_data = token * EMBED_DIM;
+) {
+    cl_kernel k = container.kernels[__layer_norm];
 
-    memcpy(output, input, total_num_data * sizeof(float));
+    // create and write mem obj
+    const size_t data_size = N_TOTAL_TOKEN * EMBED_DIM * sizeof(float);
+    cl_mem m_input = clCreateBuffer(container.context, CL_MEM_READ_WRITE, data_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+    err = clEnqueueWriteBuffer(container.queue, m_input, CL_TRUE, 0, data_size, input, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+    
+    const size_t weight_size = weight.size * sizeof(float);
+    cl_mem m_weight = clCreateBuffer(container.context, CL_MEM_READ_WRITE, weight_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+    err = clEnqueueWriteBuffer(container.queue, m_weight, CL_TRUE, 0, weight_size, weight.data, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+    
+    const size_t bias_size = bias.size * sizeof(float);
+    cl_mem m_bias = clCreateBuffer(container.context, CL_MEM_READ_WRITE, bias_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+    err = clEnqueueWriteBuffer(container.queue, m_bias, CL_TRUE, 0, bias_size, bias.data, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
 
-    const size_t work_group_size = 1024;
-    for (int t = 0; t < token; t++) {
-        float* p_data = output + t * EMBED_DIM;
-        const size_t n_data = EMBED_DIM;
+    cl_mem m_output = clCreateBuffer(container.context, CL_MEM_READ_WRITE, data_size, NULL, &err);
+    CHECK_CL_ERROR(err);
 
-        // create and write mem obj
-        size_t data_size = n_data * sizeof(float);
-        cl_mem m_data = clCreateBuffer(container.context, CL_MEM_READ_WRITE, data_size, NULL, &err);
-        err = clEnqueueWriteBuffer(container.queue, m_data, CL_TRUE, 0, data_size, p_data, 0, NULL, NULL);
-
-        size_t weight_size = weight.size * sizeof(float);
-        cl_mem m_weight = clCreateBuffer(container.context, CL_MEM_READ_WRITE, weight_size, NULL, &err);
-        err = clEnqueueWriteBuffer(container.queue, m_weight, CL_TRUE, 0, weight_size, weight.data, 0, NULL, NULL);
-
-        size_t bias_size = bias.size * sizeof(float);
-        cl_mem m_bias = clCreateBuffer(container.context, CL_MEM_READ_WRITE, bias_size, NULL, &err);
-        err = clEnqueueWriteBuffer(container.queue, m_bias, CL_TRUE, 0, bias_size, bias.data, 0, NULL, NULL);
-
-        size_t just_float1_size = sizeof(float);
-        cl_mem m_sum = clCreateBuffer(container.context, CL_MEM_READ_WRITE, just_float1_size, NULL, &err);
-        cl_mem m_sum_of_square = clCreateBuffer(container.context, CL_MEM_READ_WRITE, just_float1_size, NULL, &err);
-        cl_mem m_mean = clCreateBuffer(container.context, CL_MEM_READ_WRITE, just_float1_size, NULL, &err);
-        cl_mem m_inv_std = clCreateBuffer(container.context, CL_MEM_READ_WRITE, just_float1_size, NULL, &err);
-
-
-
-        // run kernels
-        v_reduce_sum(m_data, m_sum, n_data, work_group_size, 0, NULL, NULL);
-        v_reduce_sum_of_square(m_data, m_sum_of_square, n_data, work_group_size, 0, NULL, NULL);
-        v_cal_mean_and_inv_std(m_sum, m_sum_of_square, m_mean, m_inv_std, 0, NULL, NULL);
-        v_normalize(m_data, m_weight, m_bias, m_mean, m_inv_std, total_num_data, 0, NULL, NULL);
-
-
-
-        // read result
-        err = clEnqueueReadBuffer(container.queue, m_data, CL_TRUE, 0, data_size, p_data, 0, NULL, NULL);
-
-
-        // release mem objs
-        err = clReleaseMemObject(m_data);
-        err = clReleaseMemObject(m_weight);
-        err = clReleaseMemObject(m_bias);
-        err = clReleaseMemObject(m_sum);
-        err = clReleaseMemObject(m_sum_of_square);
-        err = clReleaseMemObject(m_mean);
-        err = clReleaseMemObject(m_inv_std);
+    // set kernel args
+    // __kernel void layer_norm(
+    //     __global float* g_input,
+    //     __global float* g_weight,
+    //     __global float* g_bias,
+    //     __global float* g_output,
+    //     const int EMBED_DIM,
+    //     const int EPSILON,
+    //     __local float* l_plain_sum,
+    //     __local float* l_sum_of_square
+    // ) {
+    int embed_dim = EMBED_DIM;
+    int epsilon = EPSILON;
+    KernelArg args[] = {
+        { .size = sizeof(cl_mem), .addr = &m_input },
+        { .size = sizeof(cl_mem), .addr = &m_weight },
+        { .size = sizeof(cl_mem), .addr = &m_bias },
+        { .size = sizeof(cl_mem), .addr = &m_output },
+        { .size = sizeof(int), .addr = &embed_dim },
+        { .size = sizeof(int), .addr = &epsilon },
+        { .size = EMBED_DIM * sizeof(float), .addr = NULL },
+        { .size = EMBED_DIM * sizeof(float), .addr = NULL },
+    };
+    for (int i=0; i<8; ++i) {
+        err = clSetKernelArg(k, i, args[i].size, args[i].addr);
+        CHECK_CL_ERROR(err);
     }
+
+    // run kernel
+    const size_t global_config[] = { N_TOTAL_TOKEN * EMBED_DIM };
+    const size_t local_config[] = { EMBED_DIM };
+    err = clEnqueueNDRangeKernel(
+        container.queue, k, 
+        1, 0, global_config, local_config, 
+        0, NULL, NULL
+    );
+    CHECK_CL_ERROR(err);
+
+    // read result
+    err = clEnqueueReadBuffer(container.queue, m_output, CL_TRUE, 0, data_size, output, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+
+
+    // release
+    err = clReleaseMemObject(m_input);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_weight);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_bias);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_output);
+    CHECK_CL_ERROR(err);
 }
+
+
 
 void v_cal_mean_and_inv_std(
     cl_mem m_sum, cl_mem m_sum_of_square,
@@ -103,6 +129,8 @@ void v_cal_mean_and_inv_std(
         );
     CHECK_CL_ERROR(err);
 }
+
+
 
 void v_reduce_sum(
     cl_mem m_data,
@@ -179,6 +207,7 @@ void v_reduce_sum(
 }
 
 
+
 void v_reduce_sum_of_square(
     cl_mem m_data,
     cl_mem m_output,
@@ -235,6 +264,7 @@ void v_reduce_sum_of_square(
     err = clReleaseMemObject(m_tmp);
     CHECK_CL_ERROR(err);
 }
+
 
 
 void v_normalize(

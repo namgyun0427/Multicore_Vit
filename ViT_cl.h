@@ -69,7 +69,7 @@ extern cl_int err;
 // Kernels_idxs와 kernel_configs의 순서가 맞아야 함
 // kernel_configs 를 순회해서 각 file_path 별로 소스 코드를 뽑아서 빌드함
 
-#define N_KERNEL 14
+#define N_KERNEL 15
 
 enum Kernels_idxs {
     __reduce_sum = 0,
@@ -86,6 +86,7 @@ enum Kernels_idxs {
     __cal_result,
     __softmax,
     __softmax_score,
+    __layer_norm,
 };
 
 
