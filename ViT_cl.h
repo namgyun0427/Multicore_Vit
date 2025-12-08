@@ -117,21 +117,34 @@ char* v_get_source_code(const char* file_name, size_t* len);
 
 void v_build_error(cl_program program, cl_device_id device, cl_int err);
 
-void v_Conv2d (
-    float* input, float* output, 
-    Network weight, Network bias
+// void v_Conv2d (
+//     float* input, float* output, 
+//     Network weight, Network bias
+// );
+void v_Conv2d(
+    cl_mem m_input, cl_mem m_output,
+    cl_mem m_weight, cl_mem m_bias
 );
 
-void v_flatten_transpose (float* input, float* output);
+// void v_flatten_transpose (float* input, float* output);
+void v_flatten_transpose(cl_mem m_input, cl_mem m_output);
 
-void v_class_token (
-    float* patch_tokens, float* final_tokens, 
-    Network cls_tk
+// void v_class_token (
+//     float* patch_tokens, float* final_tokens, 
+//     Network cls_tk
+// );
+void v_class_token(
+    cl_mem m_input, cl_mem m_output,
+    cl_mem m_class_token
 );
 
-void v_pos_emb (
-    float* input, float* output, 
-    Network pos_emb
+// void v_pos_emb (
+//     float* input, float* output, 
+//     Network pos_emb
+// );
+void v_pos_emb(
+    cl_mem m_input, cl_mem m_output,
+    cl_mem m_pos_emb
 );
 
 // void v_Encoder(

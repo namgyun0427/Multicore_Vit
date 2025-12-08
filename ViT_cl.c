@@ -228,40 +228,59 @@ void ViT_cl(
     for (int i = 0; i < image->n; i++) {
         printf("============= processing %d-th iamge =============\n", i);
 
+        // create and write input mem obj = image
+        const size_t img_size = image[i].c * image[i].h * image[i].w * sizeof(float);
+        cl_mem m_img = clCreateBuffer(container.context, CL_MEM_READ_WRITE, img_size, NULL, &err);
+        CHECK_CL_ERROR(err);
+        err = clEnqueueWriteBuffer(container.queue, m_img, CL_TRUE, 0, img_size, image[i].data, 0, NULL, NULL);
+        CHECK_CL_ERROR(err);
+        
+        // create output mem obj
+        const size_t patch_embedded_size = size[0] * sizeof(float);
+        cl_mem m_patch_embedded = clCreateBuffer(container.context, CL_MEM_READ_WRITE, patch_embedded_size, NULL, &err);
+        CHECK_CL_ERROR(err);
+        
+        const size_t flatten_transposed_size = size[1] * sizeof(float);
+        cl_mem m_flatten_transposed = clCreateBuffer(container.context, CL_MEM_READ_WRITE, flatten_transposed_size, NULL, &err);
+        CHECK_CL_ERROR(err);
+        
+        const size_t class_token_prepended_size = size[2] * sizeof(float);
+        cl_mem m_class_token_prepended = clCreateBuffer(container.context, CL_MEM_READ_WRITE, class_token_prepended_size, NULL, &err);
+        CHECK_CL_ERROR(err);
+
+        const size_t position_embeded_size = size[3] * sizeof(float);
+        cl_mem m_position_embeded = clCreateBuffer(container.context, CL_MEM_READ_WRITE, position_embeded_size, NULL, &err);
+        CHECK_CL_ERROR(err);
+
+        const size_t enc_output_size = ENC_SIZE * sizeof(float);
+        cl_mem m_enc_output_arr[12];
+        for (int i=0; i<12; ++i) {
+            m_enc_output_arr[i] = clCreateBuffer(container.context, CL_MEM_READ_WRITE, enc_output_size, NULL, &err);
+            CHECK_CL_ERROR(err);
+        }
+
+        const size_t normalized_size = N_TOTAL_TOKEN * EMBED_DIM * sizeof(float);
+        cl_mem m_normalized = clCreateBuffer(container.context, CL_MEM_READ_WRITE, normalized_size, NULL, &err);
+        CHECK_CL_ERROR(err);
+
+
+        
+
+        /* ------------------------------------------------------------------------------------ */
         /*patch embedding*/
-        float* patch_embedded = layer[0];
-        LOG("patch_embedded", v_Conv2d(image[i].data, patch_embedded, networks[1], networks[2]));
+        LOG("patch_embedded", v_Conv2d(m_img, m_patch_embedded, container.m_networks[1], container.m_networks[2]));
 
         /*flatten and transpose*/
-        float* flatten_transposed = layer[1];
-        LOG("flatten_transposed", v_flatten_transpose(patch_embedded, flatten_transposed));
+        LOG("flatten_transposed", v_flatten_transpose(m_patch_embedded, m_flatten_transposed));
 
         /*prepend class token*/
-        float* clas_token_prepended = layer[2];
-        LOG("clas_token_prepended", v_class_token(flatten_transposed, clas_token_prepended, networks[0]));
+        LOG("class_token_prepended", v_class_token(m_flatten_transposed, m_class_token_prepended, container.m_networks[0]));
 
-        /*position embedding*/
-        float* position_embeded = layer[3];
-        LOG("position_embeded", v_pos_emb(clas_token_prepended, position_embeded, networks[3]));
+        /* position embedding */
+        LOG("position_embeded", v_pos_emb(m_class_token_prepended, m_position_embeded, container.m_networks[3]));
 
         /*v_Encoder - 12 Layers*/
         {
-            // input mem obj
-            const size_t position_embeded_size = size[3] * sizeof(float);
-            cl_mem m_position_embeded = clCreateBuffer(container.context, CL_MEM_READ_WRITE, position_embeded_size, NULL, &err);
-            CHECK_CL_ERROR(err);
-            err = clEnqueueWriteBuffer(container.queue, m_position_embeded, CL_TRUE, 0, position_embeded_size, position_embeded, 0, NULL, NULL);
-            CHECK_CL_ERROR(err);
-
-            // create output mem obj
-            const size_t enc_output_size = ENC_SIZE * sizeof(float);
-            cl_mem m_enc_output_arr[12];
-            for (int i=0; i<12; ++i) {
-                m_enc_output_arr[i] = clCreateBuffer(container.context, CL_MEM_READ_WRITE, enc_output_size, NULL, &err);
-                CHECK_CL_ERROR(err);
-            }
-
-            // run encoder kernels
             v_Encoder(
                 m_position_embeded, m_enc_output_arr[0],
                 container.m_networks[4], container.m_networks[5], container.m_networks[6], container.m_networks[7],
@@ -269,184 +288,100 @@ void ViT_cl(
                 container.m_networks[12], container.m_networks[13], container.m_networks[14], container.m_networks[15]
             );
 
-            v_Encoder(m_enc_output_arr[0], m_enc_output_arr[1],
+            v_Encoder(
+                m_enc_output_arr[0], m_enc_output_arr[1],
                 container.m_networks[16], container.m_networks[17], container.m_networks[18], container.m_networks[19],
                 container.m_networks[20], container.m_networks[21], container.m_networks[22], container.m_networks[23],
-                container.m_networks[24], container.m_networks[25], container.m_networks[26], container.m_networks[27]);
+                container.m_networks[24], container.m_networks[25], container.m_networks[26], container.m_networks[27]
+            );
 
-            v_Encoder(m_enc_output_arr[1], m_enc_output_arr[2],
+            v_Encoder(
+                m_enc_output_arr[1], m_enc_output_arr[2],
                 container.m_networks[28], container.m_networks[29], container.m_networks[30], container.m_networks[31],
                 container.m_networks[32], container.m_networks[33], container.m_networks[34], container.m_networks[35],
-                container.m_networks[36], container.m_networks[37], container.m_networks[38], container.m_networks[39]);
+                container.m_networks[36], container.m_networks[37], container.m_networks[38], container.m_networks[39]
+            );
 
-            v_Encoder(m_enc_output_arr[2], m_enc_output_arr[3],
+            v_Encoder(
+                m_enc_output_arr[2], m_enc_output_arr[3],
                 container.m_networks[40], container.m_networks[41], container.m_networks[42], container.m_networks[43],
                 container.m_networks[44], container.m_networks[45], container.m_networks[46], container.m_networks[47],
-                container.m_networks[48], container.m_networks[49], container.m_networks[50], container.m_networks[51]);
+                container.m_networks[48], container.m_networks[49], container.m_networks[50], container.m_networks[51]
+            );
 
-            v_Encoder(m_enc_output_arr[3], m_enc_output_arr[4],
+            v_Encoder(
+                m_enc_output_arr[3], m_enc_output_arr[4],
                 container.m_networks[52], container.m_networks[53], container.m_networks[54], container.m_networks[55],
                 container.m_networks[56], container.m_networks[57], container.m_networks[58], container.m_networks[59],
-                container.m_networks[60], container.m_networks[61], container.m_networks[62], container.m_networks[63]);
+                container.m_networks[60], container.m_networks[61], container.m_networks[62], container.m_networks[63]
+            );
 
-            v_Encoder(m_enc_output_arr[4], m_enc_output_arr[5],
+            v_Encoder(
+                m_enc_output_arr[4], m_enc_output_arr[5],
                 container.m_networks[64], container.m_networks[65], container.m_networks[66], container.m_networks[67],
                 container.m_networks[68], container.m_networks[69], container.m_networks[70], container.m_networks[71],
-                container.m_networks[72], container.m_networks[73], container.m_networks[74], container.m_networks[75]);
+                container.m_networks[72], container.m_networks[73], container.m_networks[74], container.m_networks[75]
+            );
 
-            v_Encoder(m_enc_output_arr[5], m_enc_output_arr[6],
+            v_Encoder(
+                m_enc_output_arr[5], m_enc_output_arr[6],
                 container.m_networks[76], container.m_networks[77], container.m_networks[78], container.m_networks[79],
                 container.m_networks[80], container.m_networks[81], container.m_networks[82], container.m_networks[83],
-                container.m_networks[84], container.m_networks[85], container.m_networks[86], container.m_networks[87]);
+                container.m_networks[84], container.m_networks[85], container.m_networks[86], container.m_networks[87]
+            );
 
-            v_Encoder(m_enc_output_arr[6], m_enc_output_arr[7],
+            v_Encoder(
+                m_enc_output_arr[6], m_enc_output_arr[7],
                 container.m_networks[88], container.m_networks[89], container.m_networks[90], container.m_networks[91],
                 container.m_networks[92], container.m_networks[93], container.m_networks[94], container.m_networks[95],
-                container.m_networks[96], container.m_networks[97], container.m_networks[98], container.m_networks[99]);
+                container.m_networks[96], container.m_networks[97], container.m_networks[98], container.m_networks[99]
+            );
 
-            v_Encoder(m_enc_output_arr[7], m_enc_output_arr[8],
+            v_Encoder(
+                m_enc_output_arr[7], m_enc_output_arr[8],
                 container.m_networks[100], container.m_networks[101], container.m_networks[102], container.m_networks[103],
                 container.m_networks[104], container.m_networks[105], container.m_networks[106], container.m_networks[107],
-                container.m_networks[108], container.m_networks[109], container.m_networks[110], container.m_networks[111]);
+                container.m_networks[108], container.m_networks[109], container.m_networks[110], container.m_networks[111]
+            );
 
-            v_Encoder(m_enc_output_arr[8], m_enc_output_arr[9],
+            v_Encoder(
+                m_enc_output_arr[8], m_enc_output_arr[9],
                 container.m_networks[112], container.m_networks[113], container.m_networks[114], container.m_networks[115],
                 container.m_networks[116], container.m_networks[117], container.m_networks[118], container.m_networks[119],
-                container.m_networks[120], container.m_networks[121], container.m_networks[122], container.m_networks[123]);
+                container.m_networks[120], container.m_networks[121], container.m_networks[122], container.m_networks[123]
+            );
 
-            v_Encoder(m_enc_output_arr[9], m_enc_output_arr[10],
+            v_Encoder(
+                m_enc_output_arr[9], m_enc_output_arr[10],
                 container.m_networks[124], container.m_networks[125], container.m_networks[126], container.m_networks[127],
                 container.m_networks[128], container.m_networks[129], container.m_networks[130], container.m_networks[131],
-                container.m_networks[132], container.m_networks[133], container.m_networks[134], container.m_networks[135]);
+                container.m_networks[132], container.m_networks[133], container.m_networks[134], container.m_networks[135]
+            );
 
-            v_Encoder(m_enc_output_arr[10], m_enc_output_arr[11],
+            v_Encoder(
+                m_enc_output_arr[10], m_enc_output_arr[11],
                 container.m_networks[136], container.m_networks[137], container.m_networks[138], container.m_networks[139],
                 container.m_networks[140], container.m_networks[141], container.m_networks[142], container.m_networks[143],
-                container.m_networks[144], container.m_networks[145], container.m_networks[146], container.m_networks[147]);
-
-            // read result
-            err = clEnqueueReadBuffer(container.queue, m_enc_output_arr[11], CL_TRUE, 0, enc_output_size, enc_layer[11], 0, NULL, NULL);
-            CHECK_CL_ERROR(err);
-
-            // release mem obj
-            err = clReleaseMemObject(m_position_embeded);
-            CHECK_CL_ERROR(err);
-            for (int i=0; i<12; ++i) {
-                err = clReleaseMemObject(m_enc_output_arr[i]);
-                CHECK_CL_ERROR(err);
-            }
-
-
-
-
-
-            //////////////////////////
-
-            // v_Encoder(position_embeded, enc_layer[0],
-            //     networks[4], networks[5], networks[6], networks[7],
-            //     networks[8], networks[9], networks[10], networks[11],
-            //     networks[12], networks[13], networks[14], networks[15]);
-
-            // v_Encoder(enc_layer[0], enc_layer[1],
-            //     networks[16], networks[17], networks[18], networks[19],
-            //     networks[20], networks[21], networks[22], networks[23],
-            //     networks[24], networks[25], networks[26], networks[27]);
-
-            // v_Encoder(enc_layer[1], enc_layer[2],
-            //     networks[28], networks[29], networks[30], networks[31],
-            //     networks[32], networks[33], networks[34], networks[35],
-            //     networks[36], networks[37], networks[38], networks[39]);
-
-            // v_Encoder(enc_layer[2], enc_layer[3],
-            //     networks[40], networks[41], networks[42], networks[43],
-            //     networks[44], networks[45], networks[46], networks[47],
-            //     networks[48], networks[49], networks[50], networks[51]);
-
-            // v_Encoder(enc_layer[3], enc_layer[4],
-            //     networks[52], networks[53], networks[54], networks[55],
-            //     networks[56], networks[57], networks[58], networks[59],
-            //     networks[60], networks[61], networks[62], networks[63]);
-
-            // v_Encoder(enc_layer[4], enc_layer[5],
-            //     networks[64], networks[65], networks[66], networks[67],
-            //     networks[68], networks[69], networks[70], networks[71],
-            //     networks[72], networks[73], networks[74], networks[75]);
-
-            // v_Encoder(enc_layer[5], enc_layer[6],
-            //     networks[76], networks[77], networks[78], networks[79],
-            //     networks[80], networks[81], networks[82], networks[83],
-            //     networks[84], networks[85], networks[86], networks[87]);
-
-            // v_Encoder(enc_layer[6], enc_layer[7],
-            //     networks[88], networks[89], networks[90], networks[91],
-            //     networks[92], networks[93], networks[94], networks[95],
-            //     networks[96], networks[97], networks[98], networks[99]);
-
-            // v_Encoder(enc_layer[7], enc_layer[8],
-            //     networks[100], networks[101], networks[102], networks[103],
-            //     networks[104], networks[105], networks[106], networks[107],
-            //     networks[108], networks[109], networks[110], networks[111]);
-
-            // v_Encoder(enc_layer[8], enc_layer[9],
-            //     networks[112], networks[113], networks[114], networks[115],
-            //     networks[116], networks[117], networks[118], networks[119],
-            //     networks[120], networks[121], networks[122], networks[123]);
-
-            // v_Encoder(enc_layer[9], enc_layer[10],
-            //     networks[124], networks[125], networks[126], networks[127],
-            //     networks[128], networks[129], networks[130], networks[131],
-            //     networks[132], networks[133], networks[134], networks[135]);
-
-            // v_Encoder(enc_layer[10], enc_layer[11],
-            //     networks[136], networks[137], networks[138], networks[139],
-            //     networks[140], networks[141], networks[142], networks[143],
-            //     networks[144], networks[145], networks[146], networks[147]);
+                container.m_networks[144], container.m_networks[145], container.m_networks[146], container.m_networks[147]
+            );
         }
 
+        // layer_norm
+        LOG("normalize", v_layer_norm(m_enc_output_arr[11], m_normalized, container.m_networks[148], container.m_networks[149]));
 
-        
+
+
 
         /* ------------------------------------------------------------------------------------ */
-        // normalize
-
-        // create ans write mem obj
-        const size_t data_size = N_TOTAL_TOKEN * EMBED_DIM * sizeof(float);
-        cl_mem m_encoded = clCreateBuffer(container.context, CL_MEM_READ_WRITE, data_size, NULL, &err);
-        CHECK_CL_ERROR(err);
-        err = clEnqueueWriteBuffer(container.queue, m_encoded, CL_TRUE, 0, data_size, enc_layer[11], 0, NULL, NULL);
-        CHECK_CL_ERROR(err);
-        
-        const size_t weight_size = networks[148].size * sizeof(float);
-        cl_mem m_weight = clCreateBuffer(container.context, CL_MEM_READ_WRITE, weight_size, NULL, &err);
-        CHECK_CL_ERROR(err);
-        err = clEnqueueWriteBuffer(container.queue, m_weight, CL_TRUE, 0, weight_size, networks[148].data, 0, NULL, NULL);
-        CHECK_CL_ERROR(err);
-        
-        const size_t bias_size = networks[149].size * sizeof(float);
-        cl_mem m_bias = clCreateBuffer(container.context, CL_MEM_READ_WRITE, bias_size, NULL, &err);
-        CHECK_CL_ERROR(err);
-        err = clEnqueueWriteBuffer(container.queue, m_bias, CL_TRUE, 0, bias_size, networks[149].data, 0, NULL, NULL);
-        CHECK_CL_ERROR(err);
-
-        cl_mem m_normalized = clCreateBuffer(container.context, CL_MEM_READ_WRITE, data_size, NULL, &err);
-        CHECK_CL_ERROR(err);
-
-        // layer_norm
-        LOG("normalize", v_layer_norm(m_encoded, m_normalized, m_weight, m_bias));
-
         // read result
-        err = clEnqueueReadBuffer(container.queue, m_normalized, CL_TRUE, 0, data_size, enc_output, 0, NULL, NULL);
+        err = clEnqueueReadBuffer(container.queue, m_normalized, CL_TRUE, 0, normalized_size, enc_output, 0, NULL, NULL);
         CHECK_CL_ERROR(err);
 
-        // release
-        err = clReleaseMemObject(m_encoded);
-        CHECK_CL_ERROR(err);
-        err = clReleaseMemObject(m_weight);
-        CHECK_CL_ERROR(err);
-        err = clReleaseMemObject(m_bias);
-        CHECK_CL_ERROR(err);
-        err = clReleaseMemObject(m_normalized);
-        CHECK_CL_ERROR(err);
+        
+
+
+
+
 
 
         /* ------------------------------------------------------------------------------------ */
@@ -514,12 +449,32 @@ void ViT_cl(
         // sofemax
         LOG("sofemax", v_Softmax(cls_output, probabilities[i], NUM_CLASSES));
 
+
+        /* ------------------------------------------------------------------------------------ */
+        // release mem objs
+        err = clReleaseMemObject(m_flatten_transposed);
+        CHECK_CL_ERROR(err);
+        err = clReleaseMemObject(m_class_token_prepended);
+        CHECK_CL_ERROR(err);
+        err = clReleaseMemObject(m_position_embeded);
+        CHECK_CL_ERROR(err);
+        for (int i=0; i<12; ++i) {
+            err = clReleaseMemObject(m_enc_output_arr[i]);
+            CHECK_CL_ERROR(err);
+        }
+        err = clReleaseMemObject(m_normalized);
+        CHECK_CL_ERROR(err);
+
+        
+        
+        /* ------------------------------------------------------------------------------------ */
         // wrap up
         free(cls_token);
         free(cls_output);
     }
 
 
+    // wrap up
     for (int i = 0; i < 4; i++) free(layer[i]);
     for (int i = 0; i < 12; i++) free(enc_layer[i]);
     free(enc_output);

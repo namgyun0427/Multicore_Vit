@@ -10,92 +10,9 @@ void v_Encoder(
     cl_mem m_mlp1_weight, cl_mem m_mlp1_bias, cl_mem m_mlp2_weight, cl_mem m_mlp2_bias
 ) {
     printf(">> [v_Encoder] started\n");
-
-    int n_tokens = ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE)) + 1;
-    size_t buffer_size = sizeof(float) * n_tokens * EMBED_DIM;
-
-
-
-
-
-
-    /* ------------------------------------------------------------------------------------------- */
-    // create and write input mem obj
-    // cl_mem m_input = clCreateBuffer(container.context, CL_MEM_READ_WRITE, buffer_size, NULL, &err);
-    // CHECK_CL_ERROR(err);
-    // err = clEnqueueWriteBuffer(container.queue, m_input, CL_TRUE, 0, buffer_size, input, 0, NULL, NULL);
-    // CHECK_CL_ERROR(err);
-    
-    // const size_t ln1_weight_size = ln1_w.size * sizeof(float);
-    // cl_mem m_ln1_weight = clCreateBuffer(container.context, CL_MEM_READ_WRITE, ln1_weight_size, NULL, &err);
-    // CHECK_CL_ERROR(err);
-    // err = clEnqueueWriteBuffer(container.queue, m_ln1_weight, CL_TRUE, 0, ln1_weight_size, ln1_w.data, 0, NULL, NULL);
-    // CHECK_CL_ERROR(err);
-
-    // const size_t ln1_bias_size = ln1_b.size * sizeof(float);
-    // cl_mem m_ln1_bias = clCreateBuffer(container.context, CL_MEM_READ_WRITE, ln1_bias_size, NULL, &err);
-    // CHECK_CL_ERROR(err);
-    // err = clEnqueueWriteBuffer(container.queue, m_ln1_bias, CL_TRUE, 0, ln1_bias_size, ln1_b.data, 0, NULL, NULL);
-    // CHECK_CL_ERROR(err);
-    
-    // const size_t ln2_weight_size = ln2_w.size * sizeof(float);
-    // cl_mem m_ln2_weight = clCreateBuffer(container.context, CL_MEM_READ_WRITE, ln2_weight_size, NULL, &err);
-    // CHECK_CL_ERROR(err);
-    // err = clEnqueueWriteBuffer(container.queue, m_ln2_weight, CL_TRUE, 0, ln2_weight_size, ln2_w.data, 0, NULL, NULL);
-    // CHECK_CL_ERROR(err);
-
-    // const size_t ln2_bias_size = ln2_b.size * sizeof(float);
-    // cl_mem m_ln2_bias = clCreateBuffer(container.context, CL_MEM_READ_WRITE, ln2_bias_size, NULL, &err);
-    // CHECK_CL_ERROR(err);
-    // err = clEnqueueWriteBuffer(container.queue, m_ln2_bias, CL_TRUE, 0, ln2_bias_size, ln2_b.data, 0, NULL, NULL);
-    // CHECK_CL_ERROR(err);
-
-    // cl_mem m_attn_in_weight = clCreateBuffer(container.context, CL_MEM_READ_WRITE, attn_w.size * sizeof(float), NULL, &err);
-    // CHECK_CL_ERROR(err);
-    // err = clEnqueueWriteBuffer(container.queue, m_attn_in_weight, CL_TRUE, 0, attn_w.size * sizeof(float), attn_w.data, 0, NULL, NULL);
-    // CHECK_CL_ERROR(err);
-    
-    // cl_mem m_attn_in_bias = clCreateBuffer(container.context, CL_MEM_READ_WRITE, attn_b.size * sizeof(float), NULL, &err);
-    // CHECK_CL_ERROR(err);
-    // err = clEnqueueWriteBuffer(container.queue, m_attn_in_bias, CL_TRUE, 0, attn_b.size * sizeof(float), attn_b.data, 0, NULL, NULL);
-    // CHECK_CL_ERROR(err);
-
-    // cl_mem m_attn_out_weight = clCreateBuffer(container.context, CL_MEM_READ_WRITE, attn_out_w.size * sizeof(float), NULL, &err);
-    // CHECK_CL_ERROR(err);
-    // err = clEnqueueWriteBuffer(container.queue, m_attn_out_weight, CL_TRUE, 0, attn_out_w.size * sizeof(float), attn_out_w.data, 0, NULL, NULL);
-    // CHECK_CL_ERROR(err);
-    
-    // cl_mem m_attn_out_bias = clCreateBuffer(container.context, CL_MEM_READ_WRITE, attn_out_b.size * sizeof(float), NULL, &err);
-    // CHECK_CL_ERROR(err);
-    // err = clEnqueueWriteBuffer(container.queue, m_attn_out_bias, CL_TRUE, 0, attn_out_b.size * sizeof(float), attn_out_b.data, 0, NULL, NULL);
-    // CHECK_CL_ERROR(err);
-
-    // const size_t mlp1_weight_size = HIDDEN_DIM * EMBED_DIM * sizeof(float);
-    // cl_mem m_mlp1_weight = clCreateBuffer(container.context, CL_MEM_READ_WRITE, mlp1_weight_size, NULL, &err);
-    // CHECK_CL_ERROR(err);
-    // err = clEnqueueWriteBuffer(container.queue, m_mlp1_weight, CL_TRUE, 0, mlp1_weight_size, mlp1_w.data, 0, NULL, NULL);
-    // CHECK_CL_ERROR(err);
-
-    // const size_t mlp1_bias_size = HIDDEN_DIM * sizeof(float);
-    // cl_mem m_mlp1_bias = clCreateBuffer(container.context, CL_MEM_READ_WRITE, mlp1_bias_size, NULL, &err);
-    // CHECK_CL_ERROR(err);
-    // err = clEnqueueWriteBuffer(container.queue, m_mlp1_bias, CL_TRUE, 0, mlp1_bias_size, mlp1_b.data, 0, NULL, NULL);
-    // CHECK_CL_ERROR(err);
-
-    // const size_t mlp2_weight_size = EMBED_DIM * HIDDEN_DIM * sizeof(float);
-    // cl_mem m_mlp2_weight = clCreateBuffer(container.context, CL_MEM_READ_WRITE, mlp2_weight_size, NULL, &err);
-    // CHECK_CL_ERROR(err);
-    // err = clEnqueueWriteBuffer(container.queue, m_mlp2_weight, CL_TRUE, 0, mlp2_weight_size, mlp2_w.data, 0, NULL, NULL);
-    // CHECK_CL_ERROR(err);
-
-    // const size_t mlp2_bias_size = EMBED_DIM * sizeof(float);
-    // cl_mem m_mlp2_bias = clCreateBuffer(container.context, CL_MEM_READ_WRITE, mlp2_bias_size, NULL, &err);
-    // CHECK_CL_ERROR(err);
-    // err = clEnqueueWriteBuffer(container.queue, m_mlp2_bias, CL_TRUE, 0, mlp2_bias_size, mlp2_b.data, 0, NULL, NULL);
-    // CHECK_CL_ERROR(err);
-
     
     // create output mem obj
+    size_t buffer_size = sizeof(float) * N_TOTAL_TOKEN * EMBED_DIM;
     cl_mem m_input_normalized = clCreateBuffer(container.context, CL_MEM_READ_WRITE, buffer_size, NULL, &err);
     CHECK_CL_ERROR(err);
 
@@ -112,8 +29,6 @@ void v_Encoder(
     cl_mem m_mlp_out = clCreateBuffer(container.context, CL_MEM_READ_WRITE, mlp_out_size, NULL, &err);
     CHECK_CL_ERROR(err);
 
-    // cl_mem m_final_output = clCreateBuffer(container.context, CL_MEM_READ_WRITE, buffer_size, NULL, &err);
-    // CHECK_CL_ERROR(err);
 
 
 
@@ -142,63 +57,13 @@ void v_Encoder(
 
     /* Residual2 */
     // skip connection again
-    LOG("2nd Residual1", v_matrix_plus(m_residual, m_mlp_out, m_final_output, n_tokens * EMBED_DIM, 0, NULL, NULL));
+    LOG("2nd Residual1", v_matrix_plus(m_residual, m_mlp_out, m_final_output, N_TOTAL_TOKEN * EMBED_DIM, 0, NULL, NULL));
 
 
 
-
-
-
-    
-    /* ------------------------------------------------------------------------------------------- */
-    // read result
-    // err = clEnqueueReadBuffer(container.queue, m_final_output, CL_TRUE, 0, buffer_size, output, 0, NULL, NULL);
-    // CHECK_CL_ERROR(err);
-    
-    
-    
     
     /* ------------------------------------------------------------------------------------------- */
     // release
-    // err = clReleaseMemObject(m_input);
-    // CHECK_CL_ERROR(err);
-    // err = clReleaseMemObject(m_ln1_weight);
-    // CHECK_CL_ERROR(err);
-    // err = clReleaseMemObject(m_ln1_bias);
-    // CHECK_CL_ERROR(err);
-    // err = clReleaseMemObject(m_ln2_weight);
-    // CHECK_CL_ERROR(err);
-    // err = clReleaseMemObject(m_ln2_bias);
-    // CHECK_CL_ERROR(err);
-    // err = clReleaseMemObject(m_attn_in_weight);
-    // CHECK_CL_ERROR(err);
-    // err = clReleaseMemObject(m_attn_in_bias);
-    // CHECK_CL_ERROR(err);
-    // err = clReleaseMemObject(m_attn_out_weight);
-    // CHECK_CL_ERROR(err);
-    // err = clReleaseMemObject(m_attn_out_bias);
-    // CHECK_CL_ERROR(err);
-    // err = clReleaseMemObject(m_mlp1_weight);
-    // CHECK_CL_ERROR(err);
-    // err = clReleaseMemObject(m_mlp1_bias);
-    // CHECK_CL_ERROR(err);
-    // err = clReleaseMemObject(m_mlp2_weight);
-    // CHECK_CL_ERROR(err);
-    // err = clReleaseMemObject(m_mlp2_bias);
-    // CHECK_CL_ERROR(err);
-    // err = clReleaseMemObject(m_input_normalized);
-    // CHECK_CL_ERROR(err);
-    // err = clReleaseMemObject(m_attn_out);
-    // CHECK_CL_ERROR(err);
-    // err = clReleaseMemObject(m_residual);
-    // CHECK_CL_ERROR(err);
-    // err = clReleaseMemObject(m_residual_normalized);
-    // CHECK_CL_ERROR(err);
-    // err = clReleaseMemObject(m_mlp_out);
-    // CHECK_CL_ERROR(err);
-    // err = clReleaseMemObject(m_final_output);
-    // CHECK_CL_ERROR(err);
-
     err = clReleaseMemObject(m_input_normalized);
     CHECK_CL_ERROR(err);
     err = clReleaseMemObject(m_attn_out);
