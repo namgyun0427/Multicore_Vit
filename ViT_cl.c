@@ -1,9 +1,6 @@
 #include "ViT_cl.h"
 
-// TODO: position embedding 함수 matrix_plus쓰는 편으로 변경
 // TODO: Network 담을 buffer init에서 생성 및 초기화
-
-
 
 ////////////////////////////////////////////////////////////////////////////////////
 // constants

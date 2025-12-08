@@ -6,13 +6,33 @@ void v_pos_emb(
     float* input, float* output,
     Network pos_emb
 ) {
-    int output_size = IMG_SIZE / PATCH_SIZE;
-    int num_patches = output_size * output_size;
-    int total_tokens = num_patches + 1;
-    int total_elements = total_tokens * EMBED_DIM;
+    // create and write mem obj
+    const size_t data_size = N_TOTAL_TOKEN * EMBED_DIM * sizeof(float);
+    cl_mem m_input = clCreateBuffer(container.context, CL_MEM_READ_WRITE, data_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+    err = clEnqueueWriteBuffer(container.queue, m_input, CL_TRUE, 0, data_size, input, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
 
-    // add position embedding data
-    for (int i = 0; i < total_elements; i++) {
-        output[i] = input[i] + pos_emb.data[i];
-    }
+    cl_mem m_pos_emb = clCreateBuffer(container.context, CL_MEM_READ_WRITE, data_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+    err = clEnqueueWriteBuffer(container.queue, m_pos_emb, CL_TRUE, 0, data_size, pos_emb.data, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+
+    cl_mem m_output = clCreateBuffer(container.context, CL_MEM_READ_WRITE, data_size, NULL, &err);
+    CHECK_CL_ERROR(err);
+
+    // run kernel
+    v_matrix_plus(m_input, m_pos_emb, m_output, N_TOTAL_TOKEN * EMBED_DIM, 0, NULL, NULL);
+
+    // read result
+    err = clEnqueueReadBuffer(container.queue, m_output, CL_TRUE, 0, data_size, output, 0, NULL, NULL);
+    CHECK_CL_ERROR(err);
+
+    // release
+    err = clReleaseMemObject(m_input);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_pos_emb);
+    CHECK_CL_ERROR(err);
+    err = clReleaseMemObject(m_output);
+    CHECK_CL_ERROR(err);
 }

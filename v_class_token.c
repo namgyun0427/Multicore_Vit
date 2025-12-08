@@ -2,6 +2,7 @@
 
 // prepend class tokens in front
 // input[total_num_patches][EMBED_DIM] => output[total_num_patches + 1][EMBED_DIM]
+// TODO
 void v_class_token(
     float* patch_tokens, float* final_tokens,
     Network cls_tk
