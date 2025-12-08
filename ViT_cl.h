@@ -143,10 +143,15 @@ void v_multihead_attn(
     cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
 );
 
-void v_mlp_block (
-    float* input, float* output, 
-    Network fc1_weight, Network fc1_bias, 
-    Network fc2_weight, Network fc2_bias
+// void v_mlp_block (
+//     float* input, float* output, 
+//     Network fc1_weight, Network fc1_bias, 
+//     Network fc2_weight, Network fc2_bias
+// );
+void v_mlp_block(
+    cl_mem m_input, cl_mem m_output,
+    cl_mem m_weight1, cl_mem m_bias1,
+    cl_mem m_weight2, cl_mem m_bias2
 );
 
 void v_gelu (cl_mem m_data, size_t n_data);
