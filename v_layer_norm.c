@@ -2,7 +2,6 @@
 
 // normalize
 // input[total_num_patches + 1][EMBED_DIM] => output[total_num_patches + 1][EMBED_DIM]
-
 void v_layer_norm(
     cl_mem m_input, cl_mem m_output,
     cl_mem m_weight, cl_mem m_bias

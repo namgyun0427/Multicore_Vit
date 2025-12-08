@@ -69,7 +69,7 @@ extern cl_int err;
 // Kernels_idxs와 kernel_configs의 순서가 맞아야 함
 // kernel_configs 를 순회해서 각 file_path 별로 소스 코드를 뽑아서 빌드함
 
-#define N_KERNEL 8
+#define N_KERNEL 9
 
 enum Kernels_idxs {
     __matrix_plus = 0,
@@ -80,6 +80,7 @@ enum Kernels_idxs {
     __softmax,
     __softmax_score,
     __layer_norm,
+    __patch_embed,
 };
 
 
@@ -143,11 +144,6 @@ void v_multihead_attn(
     cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
 );
 
-// void v_mlp_block (
-//     float* input, float* output, 
-//     Network fc1_weight, Network fc1_bias, 
-//     Network fc2_weight, Network fc2_bias
-// );
 void v_mlp_block(
     cl_mem m_input, cl_mem m_output,
     cl_mem m_weight1, cl_mem m_bias1,
@@ -163,10 +159,6 @@ void v_layer_norm(
     cl_mem m_weight, cl_mem m_bias
 );
 
-void matrix_plus (
-    float* input1, float* input2, float* output, 
-    size_t n_data
-);
 
 void v_matrix_plus(
     cl_mem m_input1, cl_mem m_input2, 
