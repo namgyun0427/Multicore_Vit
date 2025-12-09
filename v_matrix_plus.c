@@ -6,6 +6,8 @@ void v_matrix_plus(
     size_t n_data,
     cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
 ) {
+    assert(n_data % 4 == 0);
+
     cl_kernel k = container.kernels[__matrix_plus];
 
     // set kernel args
@@ -26,7 +28,7 @@ void v_matrix_plus(
     }
 
     // run kernel
-    size_t dim_config[] = { n_data };
+    size_t dim_config[] = { n_data / 4 };
     err = clEnqueueNDRangeKernel(
         container.queue, k,
         1, NULL, dim_config, NULL,
