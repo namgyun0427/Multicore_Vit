@@ -1,4 +1,3 @@
-kk2
 #include "ViT_cl.h"
 
 void v_Conv2d(
@@ -7,7 +6,7 @@ void v_Conv2d(
     ) {
     const int OUTPUT_SIZE = IMG_SIZE / PATCH_SIZE;
 
-    cl_kernel k = container.kernels[__patch_embed];
+    cl_kernel k = container.kernels[__conv2d];
 
     int imgsize = IMG_SIZE;
     int outsize = OUTPUT_SIZE;

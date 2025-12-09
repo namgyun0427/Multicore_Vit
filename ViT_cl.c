@@ -23,7 +23,7 @@ cl_int err;
 
 Kernel_config kernel_configs[N_KERNEL] = {
     {.kernel_name = "matrix_plus", .file_path = "./kernels/matrix_plus.cl" },
-    {.kernel_name = "linear", .file_path = "./kernels/linear.cl" },
+    {.kernel_name = "linear_layer", .file_path = "./kernels/linear_layer.cl" },
     {.kernel_name = "gelu", .file_path = "./kernels/gelu.cl" },
     {.kernel_name = "cal_score", .file_path = "./kernels/multihead_attrention/cal_score.cl" },
     {.kernel_name = "cal_result", .file_path = "./kernels/multihead_attrention/cal_result.cl" },

@@ -61,7 +61,7 @@ extern cl_int err;
 
 enum Kernels_idxs {
     __matrix_plus = 0,
-    __linear,
+    __linear_layer,
     __gelu,
     __cal_score,
     __cal_result,
