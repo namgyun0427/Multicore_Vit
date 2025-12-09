@@ -32,7 +32,6 @@ void v_Encoder(
 
 
 
-    /* ------------------------------------------------------------------------------------------- */
     // normalize input
     LOG("input_normalized", v_layer_norm(m_input, m_input_normalized, m_ln1_weight, m_ln1_bias));
 
@@ -62,7 +61,6 @@ void v_Encoder(
 
 
     
-    /* ------------------------------------------------------------------------------------------- */
     // release
     err = clReleaseMemObject(m_input_normalized);
     CHECK_CL_ERROR(err);

@@ -3,11 +3,9 @@
 #define _ViT_cl_H
 
 #ifdef _WIN32
-    #pragma warning(disable : 4996)
+    #pragma warning(disable:4996)
 #endif
 
-/////////////////////////////////////////////////////////////////////////////
-// includes
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,9 +24,6 @@
 #include "Network.h"
 
 
-/////////////////////////////////////////////////////////////////////////////
-// structs
-
 typedef struct Kernel_config {
     const char* const kernel_name;
     const char* const file_path;
@@ -46,7 +41,7 @@ typedef struct CL_container{
     size_t n_kernels;
 
     Kernel_config* kernel_configs;
-    cl_kernel* kernels;     // TODO: 생각해보니 이거 malloc할 필요가 없는데? -> 시간 남으면 바꾸자
+    cl_kernel* kernels;     
     char** src_arr;
     size_t* len_arr;
 
@@ -58,18 +53,9 @@ typedef struct KernelArg {
     const void* addr;
 } KernelArg;
 
-/////////////////////////////////////////////////////////////////////////////
-// export global variables
-
 extern CL_container container;
 extern cl_int err;
 
-
-/////////////////////////////////////////////////////////////////////////////
-// kernel configuration
-// 커널 개수 알맞게 바꾸고, enum 및 필요 정보 추가
-// Kernels_idxs와 kernel_configs의 순서가 맞아야 함
-// kernel_configs 를 순회해서 각 file_path 별로 소스 코드를 뽑아서 빌드함
 
 #define N_KERNEL 10
 
@@ -87,8 +73,6 @@ enum Kernels_idxs {
 };
 
 
-/////////////////////////////////////////////////////////////////////////////
-// macro function
 
 #define UNUSED(var) \
     (void)(var);
@@ -99,14 +83,10 @@ enum Kernels_idxs {
         exit(EXIT_FAILURE); \
     }   \
 
-/////////////////////////////////////////////////////////////////////////////
-// core function
 
 void ViT_cl(ImageData* image, Network* networks, float** prb);
 
 
-/////////////////////////////////////////////////////////////////////////////
-// sub functions
 
 void init();
 

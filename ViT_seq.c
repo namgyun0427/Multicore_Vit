@@ -4,9 +4,6 @@
 #define UNUSED(var) \
     (void)(var);
 
-////////////////////////////////////////////////////////////////////////////////////
-// constants
-
 static const int size[] = {
     EMBED_DIM * (IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE), // conv2D
     EMBED_DIM * (IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE), // flatten and transpose
@@ -16,9 +13,6 @@ static const int size[] = {
 
 static const int enc_size = EMBED_DIM * ((IMG_SIZE / PATCH_SIZE) * (IMG_SIZE / PATCH_SIZE) + 1);
 
-
-////////////////////////////////////////////////////////////////////////////////////
-// static funtion declaration
 
 
 static void Conv2d (
@@ -72,9 +66,6 @@ static void linear_layer (
 );
 
 
-
-////////////////////////////////////////////////////////////////////////////////////
-// core funciton
 
 /*
 Network networks[152]
@@ -221,8 +212,6 @@ void ViT_seq (
 
 
 
-////////////////////////////////////////////////////////////////////////////////////
-// sub funcitons
 
 // image patch embedding (convolution)
 // input[IN_CAHNS][PATCH_SIZE][PATCH_SIZE] => output[EMBED_DIM][n_patch_per_image][n_patch_per_image]
@@ -272,7 +261,6 @@ static void Conv2d (
 
 
 
-/* ------------------------------------------------------------------------------ */
 // transpose + flat
 // input[EMBED_DIM][n_patch_per_image][n_patch_per_image] => output[total_num_patches][EMBED_DIM]
 static void flatten_transpose (float* input, float* output) {
@@ -299,7 +287,6 @@ static void flatten_transpose (float* input, float* output) {
 
 
 
-/* ------------------------------------------------------------------------------ */
 // prepend class tokens in front
 // input[total_num_patches][EMBED_DIM] => output[total_num_patches + 1][EMBED_DIM]
 static void class_token (
@@ -326,7 +313,6 @@ static void class_token (
 
 
 
-/* ------------------------------------------------------------------------------ */
 // add position embedding data
 // input[total_num_patches + 1][EMBED_DIM] => output[total_num_patches + 1][EMBED_DIM]
 static void pos_emb (
@@ -346,7 +332,6 @@ static void pos_emb (
 
 
 
-/* ------------------------------------------------------------------------------ */
 // encode input
 // input[total_num_patches + 1][EMBED_DIM]
 static void Encoder(
@@ -586,10 +571,8 @@ static float gelu(float x) {
 
 
 
-/* ------------------------------------------------------------------------------ */
 //
 static void Softmax(float* logits, float* probabilities, int length) {
-    // ��ġ �������� ���� �ִ밪 ���
     float max_val = logits[0];
     for (int i = 1; i < length; i++) {
         if (logits[i] > max_val) {
@@ -597,14 +580,12 @@ static void Softmax(float* logits, float* probabilities, int length) {
         }
     }
 
-    // �� ���ҿ� ���� exp(logit - max_val)�� ����ϰ� �ջ�
     float sum_exp = 0.0f;
     for (int i = 0; i < length; i++) {
         probabilities[i] = expf(logits[i] - max_val);
         sum_exp += probabilities[i];
     }
 
-    // Ȯ�������� ����ȭ
     for (int i = 0; i < length; i++) {
         probabilities[i] /= sum_exp;
     }
@@ -612,8 +593,6 @@ static void Softmax(float* logits, float* probabilities, int length) {
 
 
 
-////////////////////////////////////////////////////////////////////////////////////
-// rather common functions
 
 // normalize
 // input[total_num_patches + 1][EMBED_DIM] => output[total_num_patches + 1][EMBED_DIM]

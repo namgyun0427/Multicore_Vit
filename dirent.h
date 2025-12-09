@@ -14,7 +14,7 @@
     #define MAX_FILENAME_LEN 260
 
     struct dirent {
-        char d_name[MAX_FILENAME_LEN];  // ���� �̸�
+        char d_name[MAX_FILENAME_LEN];
     };
 
     typedef struct {

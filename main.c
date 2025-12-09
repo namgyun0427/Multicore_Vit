@@ -27,7 +27,6 @@ const char* imagenet_label[1000] = {
 };
 
 int main() {
-    ////////////////////////////////////// Input load //////////////////////////////////////
     const char* img_filename = IMG_FILE_PATH;
     ImageData* images = load_image_data(img_filename);
     if (images == NULL) {
@@ -38,11 +37,9 @@ int main() {
 
     UNUSED(image_size);
 
-    ////////////////////////////////////// Weight load //////////////////////////////////////
     Network network[152];
     load_weights("./Network", network, 152);
 
-    ////////////////////////////////////// Model //////////////////////////////////////
     // float probabilities[n][1000] 
     int n = images->n;
     float** probabilities = (float**)malloc(sizeof(float*) * n);
