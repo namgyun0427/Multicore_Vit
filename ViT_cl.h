@@ -68,7 +68,7 @@ enum Kernels_idxs {
     __softmax,
     __softmax_score,
     __layer_norm,
-    __patch_embed,
+    __conv2d,
     __flatten_transpose,
 };
 

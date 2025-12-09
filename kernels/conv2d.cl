@@ -1,7 +1,7 @@
 #define PATCH_SIZE 16
 #define IN_CHANNELS 3
 
-__kernel void patch_embed(
+__kernel void conv2d(
     __global const float* input,      // [C_in, H, W]
     __global const float* weight,     // [C_out, C_in, K, K]
     __global const float* bias,       // [C_out]

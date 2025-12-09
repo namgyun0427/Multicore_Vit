@@ -30,7 +30,7 @@ Kernel_config kernel_configs[N_KERNEL] = {
     {.kernel_name = "softmax_kernel", .file_path = "./kernels/softmax.cl" },
     {.kernel_name = "softmax_score_kernel", .file_path = "./kernels/softmax_score.cl" },
     {.kernel_name = "layer_norm", .file_path = "./kernels/layer_norm.cl" },
-    {.kernel_name = "patch_embed", .file_path = "./kernels/patch_embed.cl" },
+    {.kernel_name = "conv2d", .file_path = "./kernels/conv2d.cl" },
     {.kernel_name = "flatten_transpose", .file_path = "./kernels/flatten_transpose.cl" },
 };
 
