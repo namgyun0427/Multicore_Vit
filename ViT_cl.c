@@ -322,7 +322,7 @@ void ViT_cl(
                 container.m_networks[56], container.m_networks[57], container.m_networks[58], container.m_networks[59],
                 container.m_networks[60], container.m_networks[61], container.m_networks[62], container.m_networks[63],
                 1, &e_encoder[3], &e_encoder[4]
-                );
+            );
 
             v_Encoder(
                 m_enc_output_arr[4], m_enc_output_arr[5],
@@ -330,7 +330,7 @@ void ViT_cl(
                 container.m_networks[68], container.m_networks[69], container.m_networks[70], container.m_networks[71],
                 container.m_networks[72], container.m_networks[73], container.m_networks[74], container.m_networks[75],
                 1, &e_encoder[4], &e_encoder[5]
-                );
+            );
 
             v_Encoder(
                 m_enc_output_arr[5], m_enc_output_arr[6],
@@ -338,7 +338,7 @@ void ViT_cl(
                 container.m_networks[80], container.m_networks[81], container.m_networks[82], container.m_networks[83],
                 container.m_networks[84], container.m_networks[85], container.m_networks[86], container.m_networks[87],
                 1, &e_encoder[5], &e_encoder[6]
-                );
+            );
 
             v_Encoder(
                 m_enc_output_arr[6], m_enc_output_arr[7],
@@ -346,7 +346,7 @@ void ViT_cl(
                 container.m_networks[92], container.m_networks[93], container.m_networks[94], container.m_networks[95],
                 container.m_networks[96], container.m_networks[97], container.m_networks[98], container.m_networks[99],
                 1, &e_encoder[6], &e_encoder[7]
-                );
+            );
 
             v_Encoder(
                 m_enc_output_arr[7], m_enc_output_arr[8],
@@ -354,7 +354,7 @@ void ViT_cl(
                 container.m_networks[104], container.m_networks[105], container.m_networks[106], container.m_networks[107],
                 container.m_networks[108], container.m_networks[109], container.m_networks[110], container.m_networks[111],
                 1, &e_encoder[7], &e_encoder[8]
-                );
+            );
 
             v_Encoder(
                 m_enc_output_arr[8], m_enc_output_arr[9],
@@ -362,7 +362,7 @@ void ViT_cl(
                 container.m_networks[116], container.m_networks[117], container.m_networks[118], container.m_networks[119],
                 container.m_networks[120], container.m_networks[121], container.m_networks[122], container.m_networks[123],
                 1, &e_encoder[8], &e_encoder[9]
-                );
+            );
 
             v_Encoder(
                 m_enc_output_arr[9], m_enc_output_arr[10],
@@ -370,7 +370,7 @@ void ViT_cl(
                 container.m_networks[128], container.m_networks[129], container.m_networks[130], container.m_networks[131],
                 container.m_networks[132], container.m_networks[133], container.m_networks[134], container.m_networks[135],
                 1, &e_encoder[9], &e_encoder[10]
-                );
+            );
 
             v_Encoder(
                 m_enc_output_arr[10], m_enc_output_arr[11],

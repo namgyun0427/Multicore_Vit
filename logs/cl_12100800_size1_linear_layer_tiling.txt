@@ -1,0 +1,137 @@
+=====================Start========================
+>> [ViT_cl] : start
+>> [init] : start
+>> [init] : ended
+============= processing 0-th iamge =============
+patch_embedded, 0.13
+flatten_transposed, 0.02
+class_token_prepended, 0.04
+position_embeded, 0.10
+>> [v_Encoder] started
+, 0.00
+input_normalized, 0.01
+multi-head self attention, 29.37
+1st Residual1, 0.02
+residual_normalized, 0.02
+MLP, 0.12
+2nd Residual1, 0.07
+>> [v_Encoder] ended
+, 0.00
+>> [v_Encoder] started
+, 0.00
+input_normalized, 0.02
+multi-head self attention, 23.63
+1st Residual1, 0.02
+residual_normalized, 0.01
+MLP, 0.10
+2nd Residual1, 0.01
+>> [v_Encoder] ended
+, 0.00
+>> [v_Encoder] started
+, 0.00
+input_normalized, 0.02
+multi-head self attention, 23.67
+1st Residual1, 0.02
+residual_normalized, 0.01
+MLP, 0.11
+2nd Residual1, 0.01
+>> [v_Encoder] ended
+, 0.00
+>> [v_Encoder] started
+, 0.00
+input_normalized, 0.02
+multi-head self attention, 23.90
+1st Residual1, 0.02
+residual_normalized, 0.01
+MLP, 0.10
+2nd Residual1, 0.07
+>> [v_Encoder] ended
+, 0.00
+>> [v_Encoder] started
+, 0.00
+input_normalized, 0.02
+multi-head self attention, 10.04
+1st Residual1, 0.02
+residual_normalized, 0.01
+MLP, 0.10
+2nd Residual1, 0.01
+>> [v_Encoder] ended
+, 0.00
+>> [v_Encoder] started
+, 0.00
+input_normalized, 0.02
+multi-head self attention, 9.97
+1st Residual1, 0.02
+residual_normalized, 0.01
+MLP, 0.10
+2nd Residual1, 0.01
+>> [v_Encoder] ended
+, 0.00
+>> [v_Encoder] started
+, 0.00
+input_normalized, 0.02
+multi-head self attention, 10.12
+1st Residual1, 0.02
+residual_normalized, 0.01
+MLP, 0.10
+2nd Residual1, 0.01
+>> [v_Encoder] ended
+, 0.00
+>> [v_Encoder] started
+, 0.00
+input_normalized, 0.02
+multi-head self attention, 10.18
+1st Residual1, 0.02
+residual_normalized, 0.01
+MLP, 0.11
+2nd Residual1, 0.01
+>> [v_Encoder] ended
+, 0.00
+>> [v_Encoder] started
+, 0.00
+input_normalized, 0.03
+multi-head self attention, 10.08
+1st Residual1, 0.02
+residual_normalized, 0.01
+MLP, 0.11
+2nd Residual1, 0.01
+>> [v_Encoder] ended
+, 0.00
+>> [v_Encoder] started
+, 0.00
+input_normalized, 0.02
+multi-head self attention, 10.03
+1st Residual1, 0.02
+residual_normalized, 0.01
+MLP, 0.10
+2nd Residual1, 0.01
+>> [v_Encoder] ended
+, 0.00
+>> [v_Encoder] started
+, 0.00
+input_normalized, 0.02
+multi-head self attention, 9.97
+1st Residual1, 0.02
+residual_normalized, 0.01
+MLP, 0.10
+2nd Residual1, 0.01
+>> [v_Encoder] ended
+, 0.00
+>> [v_Encoder] started
+, 0.00
+input_normalized, 0.02
+multi-head self attention, 9.96
+1st Residual1, 0.02
+residual_normalized, 0.01
+MLP, 0.11
+2nd Residual1, 0.01
+>> [v_Encoder] ended
+, 0.00
+normalize, 0.02
+cls_output, 0.01
+sofemax, 0.01
+>> [cleanup] : start
+>> [cleanup] : ended
+>> [ViT_cl] : ended
+Elapsed time: 0.63 sec
+Comparator: all same.

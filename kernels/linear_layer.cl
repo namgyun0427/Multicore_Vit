@@ -47,6 +47,7 @@ __kernel void linear_layer(
 
 
 		// acuumalte
+		#pragma unroll
 		for (int k=0; k<TS; ++k) {
 			sum += Isub[t_lid][k] * Wsub[o_lid][k];
 		}

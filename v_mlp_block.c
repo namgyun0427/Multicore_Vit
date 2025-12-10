@@ -1,5 +1,10 @@
 #include "ViT_cl.h"
 
+static void v_gelu (
+    cl_mem m_data, size_t n_data,
+    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
+);
+
 // multi-layer perceptron
 void v_mlp_block(
     cl_mem m_input, cl_mem m_output,
@@ -33,7 +38,7 @@ void v_mlp_block(
     );
 }
 
-void v_gelu (
+static void v_gelu (
     cl_mem m_data, size_t n_data,
     cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
 ) {

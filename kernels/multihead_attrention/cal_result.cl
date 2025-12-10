@@ -11,21 +11,10 @@ __kernel void cal_result(
 
 	float sum = 0.0f;
 
+	#pragma unroll
 	for (int j = 0; j < N_TOTAL_TOKEN; j++) {
 		sum += g_scores[i * N_TOTAL_TOKEN + j] * g_V[j * EMBED_DIM + head_offset + d];
 	}
 
 	g_attn_output[i * EMBED_DIM + head_offset + d] = sum;
 }
-
-// calculate result
-// for (int i = 0; i < n_tokens; i++) {
-// 	for (int d = 0; d < head_dim; d++) {
-// 		float sum = 0.0f;
-// 		for (int j = 0; j < n_tokens; j++) {
-// 			sum += scores[i * n_tokens + j] * V[j * EMBED_DIM + head_offset + d];
-// 		}
-
-// 		attn_output[i * EMBED_DIM + head_offset + d] = sum;
-// 	}
-// }

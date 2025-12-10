@@ -144,11 +144,6 @@ void v_mlp_block(
     cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
 );
 
-void v_gelu (
-    cl_mem m_data, size_t n_data,
-    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
-);
-
 // void v_Softmax(float* logits, float* probabilities, int length);
 void v_Softmax(
     cl_mem m_input, cl_mem m_output, int length,

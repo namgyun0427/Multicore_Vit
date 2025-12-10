@@ -13,6 +13,7 @@ __kernel void cal_score (
 
     float score = 0.0f;
 
+	#pragma unroll
     for (int d=0; d < HEAD_DIM; ++d) {
         float q = g_Q[i * EMBED_DIM + head_offset + d];
         float k = g_K[j * EMBED_DIM + head_offset + d];
