@@ -2,8 +2,9 @@
 
 void v_Conv2d(
     cl_mem m_input, cl_mem m_output,
-    cl_mem m_weight, cl_mem m_bias
-    ) {
+    cl_mem m_weight, cl_mem m_bias,
+    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
+) {
     const int OUTPUT_SIZE = IMG_SIZE / PATCH_SIZE;
 
     cl_kernel k = container.kernels[__conv2d];
@@ -31,6 +32,6 @@ void v_Conv2d(
         (size_t)EMBED_DIM     // dim 2: oc (768)
     };
 
-    err = clEnqueueNDRangeKernel(container.queue, k, 3, 0, global_dim, NULL, 0, NULL, NULL);
+    err = clEnqueueNDRangeKernel(container.queue, k, 3, 0, global_dim, NULL, e_num_waiting, e_waiting_arr, e_out);
     CHECK_CL_ERROR(err);
 }

@@ -92,27 +92,33 @@ void init();
 
 void cleanup();
 
-
 char* v_get_source_code(const char* file_name, size_t* len);
 
 void v_build_error(cl_program program, cl_device_id device, cl_int err);
 
 
+
 void v_Conv2d(
     cl_mem m_input, cl_mem m_output,
-    cl_mem m_weight, cl_mem m_bias
+    cl_mem m_weight, cl_mem m_bias,
+    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
 );
 
-void v_flatten_transpose(cl_mem m_input, cl_mem m_output);
+void v_flatten_transpose(
+    cl_mem m_input, cl_mem m_output,
+    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
+);
 
 void v_class_token(
     cl_mem m_input, cl_mem m_output,
-    cl_mem m_class_token
+    cl_mem m_class_token,
+    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
 );
 
 void v_pos_emb(
     cl_mem m_input, cl_mem m_output,
-    cl_mem m_pos_emb
+    cl_mem m_pos_emb,
+    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
 );
 
 void v_Encoder(
@@ -120,7 +126,8 @@ void v_Encoder(
     cl_mem m_ln1_weight, cl_mem m_ln1_bias,
     cl_mem m_attn_in_weight, cl_mem m_attn_in_bias, cl_mem m_attn_out_weight, cl_mem m_attn_out_bias, 
     cl_mem m_ln2_weight, cl_mem m_ln2_bias, 
-    cl_mem m_mlp1_weight, cl_mem m_mlp1_bias, cl_mem m_mlp2_weight, cl_mem m_mlp2_bias
+    cl_mem m_mlp1_weight, cl_mem m_mlp1_bias, cl_mem m_mlp2_weight, cl_mem m_mlp2_bias,
+    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
 );
 
 void v_multihead_attn(
@@ -133,17 +140,25 @@ void v_multihead_attn(
 void v_mlp_block(
     cl_mem m_input, cl_mem m_output,
     cl_mem m_weight1, cl_mem m_bias1,
-    cl_mem m_weight2, cl_mem m_bias2
+    cl_mem m_weight2, cl_mem m_bias2,
+    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
 );
 
-void v_gelu (cl_mem m_data, size_t n_data);
+void v_gelu (
+    cl_mem m_data, size_t n_data,
+    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
+);
 
 // void v_Softmax(float* logits, float* probabilities, int length);
-void v_Softmax(cl_mem m_input, cl_mem m_output, int length);
+void v_Softmax(
+    cl_mem m_input, cl_mem m_output, int length,
+    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
+);
 
 void v_layer_norm(
     cl_mem m_input, cl_mem m_output,
-    cl_mem m_weight, cl_mem m_bias
+    cl_mem m_weight, cl_mem m_bias,
+    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
 );
 
 void v_matrix_plus(

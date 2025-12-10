@@ -1,7 +1,10 @@
 #include "ViT_cl.h"
 
 // Softmax 
-void v_Softmax(cl_mem m_input, cl_mem m_output, int length) {
+void v_Softmax(
+    cl_mem m_input, cl_mem m_output, int length,
+    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
+) {
     // 1. 메모리 객체 생성 ( logits -> probabilities )
     // logits은 입력, probabilities는 출력입니다.
     // logits, probabilities는 Host 메모리 포인터-> Device 버퍼를 만들어 사용
@@ -43,7 +46,7 @@ void v_Softmax(cl_mem m_input, cl_mem m_output, int length) {
     size_t local_work_size[] = { 256 };
     size_t global_work_size[] = { 256 }; // 1개 워크그룹
 
-    err = clEnqueueNDRangeKernel(container.queue, k, 1, NULL, global_work_size, local_work_size, 0, NULL, NULL);
+    err = clEnqueueNDRangeKernel(container.queue, k, 1, NULL, global_work_size, local_work_size, e_num_waiting, e_waiting_arr, e_out);
     CHECK_CL_ERROR(err);
 
     // 5. 결과 읽기 (Device -> Host)

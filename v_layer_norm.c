@@ -4,7 +4,8 @@
 // input[total_num_patches + 1][EMBED_DIM] => output[total_num_patches + 1][EMBED_DIM]
 void v_layer_norm(
     cl_mem m_input, cl_mem m_output,
-    cl_mem m_weight, cl_mem m_bias
+    cl_mem m_weight, cl_mem m_bias,
+    cl_uint e_num_waiting, const cl_event* e_waiting_arr, cl_event* e_out
 ) {
     cl_kernel k = container.kernels[__layer_norm];
 
@@ -42,7 +43,7 @@ void v_layer_norm(
     err = clEnqueueNDRangeKernel(
         container.queue, k, 
         1, 0, global_config, local_config, 
-        0, NULL, NULL
+        e_num_waiting, e_waiting_arr, e_out
     );
     CHECK_CL_ERROR(err);
 }
