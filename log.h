@@ -4,11 +4,6 @@
 
 
 #define LOG(msg, code) \
-    do {    \
-        clock_t start = clock(); \
-        code;   \
-        clock_t end = clock();  \
-        printf("%s, %.2f\n", msg, (double)(end - start) * 1000 / CLOCKS_PER_SEC); \
-    } while (0);
+    code
 
 #endif // _LOG_H
